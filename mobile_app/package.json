@@ -1,0 +1,19 @@
+{
+  "name": "ihalex-mobile",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "android": "cap open android",
+    "ios": "cap open ios",
+    "sync": "cap sync"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "typescript": "^5.7.0"
+  }
+}

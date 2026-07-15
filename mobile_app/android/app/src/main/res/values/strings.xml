@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">İhalex</string>
+    <string name="title_activity_main">İhalex</string>
+    <string name="package_name">tr.com.ihalex.app</string>
+    <string name="custom_url_scheme">tr.com.ihalex.app</string>
+</resources>

@@ -1,0 +1,15 @@
+[
+    {
+        "il": "Samsun",
+        "ilce": "Atakum",
+        "site": "Sahibinden",
+        "url": "https://www.sahibinden.com",
+        "kategori": "isyeri",
+        "durum": "aktif",
+        "status_code": 200,
+        "login": true,
+        "otomatik_tarama": false,
+        "not": "Login gerektiriyor",
+        "kontrol_tarihi": "2026-07-14 22:49:59.474230"
+    }
+]

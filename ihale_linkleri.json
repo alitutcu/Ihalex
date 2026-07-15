@@ -1,0 +1,20 @@
+{
+    "linkler": [
+        {
+            "id": 1,
+            "url": "https://istanbul.meb.gov.tr/www/ihale-dosyalari/dosya/9",
+            "il": "istanbul",
+            "ilce": "tümü",
+            "kurum": "MEB",
+            "kaynak_turu": "meb",
+            "durum": "tamamlandi",
+            "aktif": true,
+            "deneme_sayisi": 1,
+            "son_hata": "",
+            "not": "yok",
+            "eklenme_tarihi": "2026-07-15 11:35:03",
+            "son_islem_tarihi": "2026-07-15 11:35:26",
+            "basarili_islem_tarihi": "2026-07-15 11:35:27"
+        }
+    ]
+}

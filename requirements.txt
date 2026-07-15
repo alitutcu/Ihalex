@@ -1,0 +1,14 @@
+beautifulsoup4
+folium
+pandas
+openpyxl
+plotly
+playwright
+pypdf
+pypdfium2
+python-docx
+rapidocr-onnxruntime
+requests
+rich
+streamlit
+streamlit-autorefresh
