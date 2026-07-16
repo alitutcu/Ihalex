@@ -1,5 +1,17 @@
 # İhalex Sürüm Geçmişi
 
+## v1.1.1 — Marka Arayüzü (2026-07-16)
+
+- İHALEX bannerı sadeleştirildi; logo tek fontta birleştirildi ve yalnızca
+  `İ` noktası ile `X` kırmızı olarak korundu.
+- Bannerın mobil ve masaüstü boşlukları dengelenerek marka görünümü yenilendi.
+- Muhammen bedelin ihale başlangıç değeri olduğu dikkate alınarak tahmini ihale
+  sonucu kira modeli yatırım skoruna ve risk hesabına bağlandı.
+- Okul türüne göre kantin kullanım oranları daha temkinli değerlerle güncellendi.
+- Eski worker sürümlerinin güncel analiz motoru sonuçlarını geri almasını
+  engelleyen veritabanı koruması eklendi.
+- Analiz motoru sürümü `1.1.9` olarak kaydedildi.
+
 ## v1.1.0 — Şeffaf Analiz Çekirdeği (2026-07-16)
 
 - Toplu MEB ilanlarındaki ek belgeler okul bazında ayrı kayıtlara bağlandı.

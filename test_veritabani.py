@@ -34,13 +34,22 @@ class VeritabaniTesti(unittest.TestCase):
 
     def test_ihalex_surumu_tarih_ve_etiketiyle_saklanir(self):
         with closing(veritabani.baglan()) as conn:
-            surum = conn.execute("""
+            onceki_surum = conn.execute("""
                 SELECT surum_kodu, surum_adi, yayin_tarihi, git_etiketi
                 FROM sistem_surumleri WHERE surum_kodu='v1.1.0'
             """).fetchone()
-        self.assertEqual("Şeffaf Analiz Çekirdeği", surum["surum_adi"])
-        self.assertEqual("2026-07-16", surum["yayin_tarihi"])
-        self.assertEqual("v1.1.0-seffaf-analiz-cekirdegi", surum["git_etiketi"])
+            guncel_surum = conn.execute("""
+                SELECT surum_kodu, surum_adi, yayin_tarihi, git_etiketi
+                FROM sistem_surumleri WHERE surum_kodu='v1.1.1'
+            """).fetchone()
+        self.assertEqual("Şeffaf Analiz Çekirdeği", onceki_surum["surum_adi"])
+        self.assertEqual("2026-07-16", onceki_surum["yayin_tarihi"])
+        self.assertEqual(
+            "v1.1.0-seffaf-analiz-cekirdegi", onceki_surum["git_etiketi"]
+        )
+        self.assertEqual("Marka Arayüzü", guncel_surum["surum_adi"])
+        self.assertEqual("2026-07-16", guncel_surum["yayin_tarihi"])
+        self.assertEqual("v1.1.1-marka-arayuzu", guncel_surum["git_etiketi"])
 
     def test_eski_ve_tarihsiz_adaylar_kalici_arsivde_saklanir(self):
         with closing(veritabani.baglan()) as conn, conn:

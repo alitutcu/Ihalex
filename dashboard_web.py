@@ -16,6 +16,7 @@ from harita_gosterici import ilce_secenekleri, turkiye_haritasi
 from harita_motoru import IL_ADLARI, ilce_harita_istatistikleri, ilce_istatistikleri
 from istatistik_motoru import tekrar_ihale_ozeti
 from meb_kaynaklari import kaynak_ozeti
+from surum_bilgisi import GUNCEL_SURUM
 from telegram_alarm import (
     TelegramKurulumHatasi,
     aktif_ilanlari_kuyruga_al,
@@ -603,5 +604,8 @@ with admin_sekmesi:
         st.warning("Önce Telegram bot bağlantısını kurmalısın.")
 
 st.divider()
-st.caption("İhalex v1.2 · Resmî MEB kaynakları · 60 saniyede otomatik yenileme")
+st.caption(
+    f"İhalex {GUNCEL_SURUM['surum_kodu']} · Resmî MEB kaynakları · "
+    "60 saniyede otomatik yenileme"
+)
 st_autorefresh(interval=60_000, limit=None, key="dashboard_yenileme")
