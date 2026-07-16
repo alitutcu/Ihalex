@@ -22,7 +22,7 @@ from analiz_ogrenme_servisi import ogrenme_ornegi_kaydet
 from okul_adi_servisi import okul_adi_temizle
 
 
-MOTOR_SURUMU = "1.1.7"
+MOTOR_SURUMU = "1.1.9"
 OKUL_TURU_HARCAMA_KATSAYILARI = {
     "ilkokul": 0.80,
     "ortaokul": 1.00,
@@ -31,11 +31,12 @@ OKUL_TURU_HARCAMA_KATSAYILARI = {
     "karma": 1.00,
 }
 OKUL_TURU_DONUSUM_ARALIKLARI = {
-    "ilkokul": (0.30, 0.50),
-    "ortaokul": (0.50, 0.70),
-    "lise": (0.60, 0.85),
-    "meslek_lisesi": (0.70, 0.90),
-    "karma": (0.50, 0.70),
+    # Önceki modelin her alt/üst sınırı göreli %10 azaltılmıştır.
+    "ilkokul": (0.27, 0.45),
+    "ortaokul": (0.45, 0.63),
+    "lise": (0.54, 0.765),
+    "meslek_lisesi": (0.63, 0.81),
+    "karma": (0.45, 0.63),
 }
 OKUL_TURU_DONUSUM_ORANLARI = {
     tur: round((aralik[0] + aralik[1]) / 2, 4)
@@ -45,7 +46,7 @@ OKUL_TURU_DONUSUM_ORANLARI = {
 OKUL_TIPI_KATSAYILARI = OKUL_TURU_HARCAMA_KATSAYILARI
 VARSAYILAN_PARAMETRELER = {
     **VARSAYILAN_PERSONEL_PARAMETRELERI,
-    "ogrenci_donusum_orani": 0.55,
+    "ogrenci_donusum_orani": 0.495,
     "personel_donusum_orani": 0.65,
     # Ortaokul bazıdır: İlkokul 80, Ortaokul 100, Lise 120 TL/gün.
     "ortalama_ogrenci_harcamasi": 100.0,
@@ -146,7 +147,7 @@ def ciro_hesapla(
     personel_sayisi: int | float = 0,
     *,
     okul_tipi: str = "bilinmiyor",
-    ogrenci_donusum_orani: float = 0.55,
+    ogrenci_donusum_orani: float = 0.495,
     personel_donusum_orani: float = 0.65,
     ortalama_ogrenci_harcamasi: float = 100.0,
     ortalama_personel_harcamasi: float = 65.0,
@@ -1198,7 +1199,8 @@ def manuel_duzeltme_kaydet(
                 aday_id, il, ilce, okul_adi, okul_turu,
                 ogrenci_sayisi, personel_sayisi,
                 muhammen_bedel_aylik, muhammen_bedel_yillik,
-                ogrenci_donusum_orani, ortalama_ogrenci_harcamasi,
+                ogrenci_donusum_orani, donusum_modeli_surumu,
+                ortalama_ogrenci_harcamasi,
                 yillik_egitim_gunu, hedef_net_kar_orani,
                 tahmini_ihale_azami_orani,
                 otomatik_personel_hesapla, manuel_calisan_sayisi,
@@ -1210,7 +1212,7 @@ def manuel_duzeltme_kaydet(
                 duzeltme_notu, duzelten, olusturma_tarihi, guncelleme_tarihi
             ) VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             ON CONFLICT(aday_id) DO UPDATE SET
                 il=excluded.il, ilce=excluded.ilce,
@@ -1220,6 +1222,7 @@ def manuel_duzeltme_kaydet(
                 muhammen_bedel_aylik=excluded.muhammen_bedel_aylik,
                 muhammen_bedel_yillik=excluded.muhammen_bedel_yillik,
                 ogrenci_donusum_orani=excluded.ogrenci_donusum_orani,
+                donusum_modeli_surumu=excluded.donusum_modeli_surumu,
                 ortalama_ogrenci_harcamasi=excluded.ortalama_ogrenci_harcamasi,
                 yillik_egitim_gunu=excluded.yillik_egitim_gunu,
                 hedef_net_kar_orani=excluded.hedef_net_kar_orani,
@@ -1244,7 +1247,8 @@ def manuel_duzeltme_kaydet(
             yeni["okul_adi"], yeni["okul_turu"],
             yeni["ogrenci_sayisi"], yeni["personel_sayisi"],
             yeni["muhammen_bedel_aylik"], yeni["muhammen_bedel_yillik"],
-            yeni["ogrenci_donusum_orani"], yeni["ortalama_ogrenci_harcamasi"],
+            yeni["ogrenci_donusum_orani"], "2026-07-16-okul-turu-yuzde10-v2",
+            yeni["ortalama_ogrenci_harcamasi"],
             yeni["yillik_egitim_gunu"], yeni["hedef_net_kar_orani"],
             yeni["tahmini_ihale_azami_orani"],
             int(yeni["otomatik_personel_hesapla"]),

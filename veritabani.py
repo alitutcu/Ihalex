@@ -411,6 +411,15 @@ def tablo_olustur() -> None:
             ON kantin_yatirim_analizleri(yatirim_skoru DESC, risk_skoru)
         """)
         conn.execute("""
+            CREATE TRIGGER IF NOT EXISTS trg_yeni_analiz_motorunu_koru
+            BEFORE UPDATE OF motor_surumu ON kantin_yatirim_analizleri
+            WHEN CAST(REPLACE(NEW.motor_surumu, '.', '') AS INTEGER)
+                 < CAST(REPLACE(OLD.motor_surumu, '.', '') AS INTEGER)
+            BEGIN
+                SELECT RAISE(IGNORE);
+            END
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS analiz_manuel_duzeltmeleri (
                 aday_id INTEGER PRIMARY KEY,
                 il TEXT,
@@ -422,6 +431,8 @@ def tablo_olustur() -> None:
                 muhammen_bedel_aylik NUMERIC,
                 muhammen_bedel_yillik NUMERIC,
                 ogrenci_donusum_orani REAL,
+                donusum_modeli_surumu TEXT NOT NULL
+                    DEFAULT '2026-07-16-okul-turu-yuzde10-v2',
                 ortalama_ogrenci_harcamasi NUMERIC,
                 yillik_egitim_gunu INTEGER,
                 hedef_net_kar_orani REAL,
@@ -451,6 +462,32 @@ def tablo_olustur() -> None:
                 "PRAGMA table_info(analiz_manuel_duzeltmeleri)"
             ).fetchall()
         }
+        if "donusum_modeli_surumu" not in manuel_kolonlari:
+            conn.execute(
+                "ALTER TABLE analiz_manuel_duzeltmeleri "
+                "ADD COLUMN donusum_modeli_surumu TEXT"
+            )
+        # Eski editör genel %60 oranını bazı okul türlerine de yazıyordu.
+        # Bu sürümlü ve idempotent göç yalnız eski kayıtları okul türünün yeni
+        # (%10 azaltılmış) ortalamasına taşır; bundan sonra kaydedilen manuel
+        # tercihler v2 etiketiyle korunur.
+        conn.execute("""
+            UPDATE analiz_manuel_duzeltmeleri
+            SET ogrenci_donusum_orani=CASE
+                    WHEN LOWER(REPLACE(okul_turu, 'İ', 'i')) LIKE '%ilkokul%'
+                        THEN 0.36
+                    WHEN LOWER(REPLACE(okul_turu, 'İ', 'i')) LIKE '%ortaokul%'
+                        THEN 0.54
+                    WHEN LOWER(REPLACE(okul_turu, 'İ', 'i')) LIKE '%meslek%lise%'
+                        THEN 0.72
+                    WHEN LOWER(REPLACE(okul_turu, 'İ', 'i')) LIKE '%lise%'
+                        THEN 0.6525
+                    ELSE ROUND(COALESCE(ogrenci_donusum_orani, 0.55) * 0.90, 6)
+                END,
+                donusum_modeli_surumu='2026-07-16-okul-turu-yuzde10-v2'
+            WHERE COALESCE(donusum_modeli_surumu, '')<>
+                  '2026-07-16-okul-turu-yuzde10-v2'
+        """)
         if "yillik_egitim_gunu" not in manuel_kolonlari:
             conn.execute(
                 "ALTER TABLE analiz_manuel_duzeltmeleri "

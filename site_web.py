@@ -85,7 +85,7 @@ SAYFA_ADLARI = {deger: anahtar for anahtar, deger in SAYFALAR.items()}
 BANNER_GORSELI = Path(__file__).resolve().parent / "assets" / "banner-school-cafeteria-source.jpg"
 ADMIN_OTURUM_SURESI = timedelta(hours=3)
 ADMIN_CEREZ_ADI = "ihalex_admin_oturum"
-VERITABANI_SEMA_SURUMU = "2026-07-16-ihale-sonuc-modeli-v4"
+VERITABANI_SEMA_SURUMU = "2026-07-16-donusum-orani-v6"
 
 
 @st.cache_data(show_spinner=False)
@@ -155,7 +155,7 @@ def stilleri_yukle(gomulu: bool) -> None:
             border: 2px solid var(--ihalex-black);
             border-radius: 16px;
             overflow: hidden;
-            margin: .25rem 0 1rem;
+            margin: 1.15rem 0 1rem;
             box-shadow: 0 7px 0 var(--ihalex-black);
         }}
         .ihalex-radar-banner::after {{
@@ -227,13 +227,15 @@ def stilleri_yukle(gomulu: bool) -> None:
         .ihalex-human-i::after {{
             content: "";
             position: absolute;
-            width: 176%;
-            height: 13%;
-            left: -38%;
-            top: 20%;
-            border-radius: 999px;
+            width: 190%;
+            height: 68%;
+            left: -45%;
+            top: -18%;
             background: var(--ihalex-black);
-            transform: rotate(-5deg);
+            clip-path: polygon(
+                0 8%, 10% 0, 50% 59%, 90% 0, 100% 8%,
+                57% 84%, 43% 84%
+            );
         }}
         .ihalex-radar-copy {{
             position: relative;
@@ -721,6 +723,7 @@ def stilleri_yukle(gomulu: bool) -> None:
                 grid-template-columns: minmax(0, 1fr) 78px;
                 height: 132px;
                 min-height: 132px;
+                margin-top: .85rem;
                 border-radius: 13px;
                 box-shadow: 0 5px 0 var(--ihalex-black);
             }}
@@ -919,6 +922,28 @@ def veri_getir() -> pd.DataFrame:
                    a.adres,
                    COALESCE(m.ogrenci_sayisi, a.ogrenci_sayisi) AS ogrenci_sayisi,
                    COALESCE(m.personel_sayisi, a.personel_sayisi) AS personel_sayisi,
+                   COALESCE(
+                       m.ogrenci_donusum_orani,
+                       CASE
+                           WHEN LOWER(REPLACE(
+                               COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu),
+                               'İ', 'i'
+                           )) LIKE '%ilkokul%' THEN 0.36
+                           WHEN LOWER(REPLACE(
+                               COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu),
+                               'İ', 'i'
+                           )) LIKE '%ortaokul%' THEN 0.54
+                           WHEN LOWER(REPLACE(
+                               COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu),
+                               'İ', 'i'
+                           )) LIKE '%meslek%lise%' THEN 0.72
+                           WHEN LOWER(REPLACE(
+                               COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu),
+                               'İ', 'i'
+                           )) LIKE '%lise%' THEN 0.6525
+                           ELSE 0.54
+                       END
+                   ) AS ogrenci_donusum_orani,
                    a.muhammen_bedel,
                    COALESCE(m.muhammen_bedel_aylik, a.muhammen_bedel_aylik)
                        AS muhammen_bedel_aylik,
@@ -988,7 +1013,8 @@ def veri_getir() -> pd.DataFrame:
         SELECT ilan_id, baslik, il, ilce, kaynak, yayin_tarihi, ihale_tarihi,
                durum, ihale_url, ilk_gorulme, eslesme_turu,
                belge_okul_adi, okul_turu, adres,
-               ogrenci_sayisi, personel_sayisi, muhammen_bedel,
+               ogrenci_sayisi, personel_sayisi, ogrenci_donusum_orani,
+               muhammen_bedel,
                muhammen_bedel_aylik, muhammen_bedel_yillik,
                muhammen_bedel_donemi,
                sartname_bedeli, gecici_teminat, kantin_alani_m2,
@@ -1808,8 +1834,10 @@ def yapay_zeka_analiz_sayfasi(df: pd.DataFrame) -> None:
                 harcama_katsayisi = OKUL_TURU_HARCAMA_KATSAYILARI.get(
                     okul_turu_anahtari
                 )
-                donusum_orani = OKUL_TURU_DONUSUM_ORANLARI.get(
-                    okul_turu_anahtari
+                donusum_orani = (
+                    float(satir["ogrenci_donusum_orani"])
+                    if _deger_var(satir.get("ogrenci_donusum_orani"))
+                    else OKUL_TURU_DONUSUM_ORANLARI.get(okul_turu_anahtari)
                 )
                 donusum_araligi = OKUL_TURU_DONUSUM_ARALIKLARI.get(
                     okul_turu_anahtari
@@ -1826,7 +1854,7 @@ def yapay_zeka_analiz_sayfasi(df: pd.DataFrame) -> None:
                     if donusum_orani is not None and donusum_araligi is not None:
                         st.caption(
                             "Kantinden alışveriş oranı · "
-                            f"%{donusum_orani * 100:.1f} ortalama "
+                            f"%{donusum_orani * 100:.2f} kullanılan oran "
                             f"(%{donusum_araligi[0] * 100:.0f}–"
                             f"%{donusum_araligi[1] * 100:.0f} model aralığı)"
                         )
@@ -2437,12 +2465,24 @@ def ai_yonetim_verileri_getir() -> pd.DataFrame:
                            AS muhammen_bedel_yillik,
                        COALESCE(
                            m.ogrenci_donusum_orani,
-                           CASE LOWER(COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu))
-                               WHEN 'ilkokul' THEN 0.40
-                               WHEN 'ortaokul' THEN 0.60
-                               WHEN 'lise' THEN 0.725
-                               WHEN 'meslek lisesi' THEN 0.80
-                               ELSE 0.60
+                           CASE
+                               WHEN LOWER(REPLACE(
+                                   COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu),
+                                   'İ', 'i'
+                               )) LIKE '%ilkokul%' THEN 0.36
+                               WHEN LOWER(REPLACE(
+                                   COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu),
+                                   'İ', 'i'
+                               )) LIKE '%ortaokul%' THEN 0.54
+                               WHEN LOWER(REPLACE(
+                                   COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu),
+                                   'İ', 'i'
+                               )) LIKE '%meslek%lise%' THEN 0.72
+                               WHEN LOWER(REPLACE(
+                                   COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu),
+                                   'İ', 'i'
+                               )) LIKE '%lise%' THEN 0.6525
+                               ELSE 0.54
                            END
                        ) AS ogrenci_donusum_orani,
                        COALESCE(m.ortalama_ogrenci_harcamasi, 100.0)

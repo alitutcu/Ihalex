@@ -74,6 +74,18 @@ class AnalizMotoruTesti(unittest.TestCase):
             analiz_motoru.analizi_kaydet(aday_id, rapor)
             kayitli = analiz_motoru.kayitli_analizi_getir(aday_id)
             self.assertEqual(rapor["yatirim_skoru"], kayitli["yatirim_skoru"])
+            with closing(veritabani.baglan()) as conn, conn:
+                conn.execute(
+                    "UPDATE kantin_yatirim_analizleri "
+                    "SET motor_surumu='1.1.5' WHERE aday_id=?",
+                    (aday_id,),
+                )
+                korunan_surum = conn.execute(
+                    "SELECT motor_surumu FROM kantin_yatirim_analizleri "
+                    "WHERE aday_id=?",
+                    (aday_id,),
+                ).fetchone()[0]
+            self.assertEqual(analiz_motoru.MOTOR_SURUMU, korunan_surum)
 
     def test_ogrenci_ve_kira_olmadan_finansal_tahmin_uretilmez(self):
         with self.assertRaises(analiz_motoru.AnalizVerisiHatasi):
@@ -105,10 +117,10 @@ class AnalizMotoruTesti(unittest.TestCase):
 
     def test_okul_turune_gore_ortalama_alisveris_orani_kullanilir(self):
         ornekler = (
-            ("İlkokul", 0.40),
-            ("Ortaokul", 0.60),
-            ("Lise", 0.725),
-            ("Meslek Lisesi", 0.80),
+            ("İlkokul", 0.36),
+            ("Ortaokul", 0.54),
+            ("Lise", 0.6525),
+            ("Meslek Lisesi", 0.72),
         )
         for okul_turu, beklenen in ornekler:
             rapor = analiz_motoru.analiz_raporu_olustur({
@@ -117,6 +129,12 @@ class AnalizMotoruTesti(unittest.TestCase):
                 "il": "Ankara", "ilce": "Mamak",
             })
             self.assertEqual(beklenen, rapor["varsayimlar"]["ogrenci_donusum_orani"])
+
+    def test_okul_turu_donusum_araliklari_goreli_yuzde_on_dusurulur(self):
+        self.assertEqual((0.27, 0.45), analiz_motoru.OKUL_TURU_DONUSUM_ARALIKLARI["ilkokul"])
+        self.assertEqual((0.45, 0.63), analiz_motoru.OKUL_TURU_DONUSUM_ARALIKLARI["ortaokul"])
+        self.assertEqual((0.54, 0.765), analiz_motoru.OKUL_TURU_DONUSUM_ARALIKLARI["lise"])
+        self.assertEqual((0.63, 0.81), analiz_motoru.OKUL_TURU_DONUSUM_ARALIKLARI["meslek_lisesi"])
 
     def test_azami_kira_yuzde_yirmi_bes_net_kar_hedefini_korur(self):
         self.assertEqual(
