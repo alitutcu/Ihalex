@@ -172,6 +172,7 @@ class AnalizMotoruTesti(unittest.TestCase):
                               10000, 120000, '2026-07-16')
                 """, (aday_id,))
             rapor = analiz_motoru.manuel_duzeltme_kaydet(aday_id, {
+                "il": "Ankara", "ilce": "Çankaya",
                 "okul_adi": "Atatürk Ortaokulu", "okul_turu": "Ortaokul",
                 "ogrenci_sayisi": 650, "personel_sayisi": 35,
                 "muhammen_bedel_aylik": 12000,
@@ -180,6 +181,7 @@ class AnalizMotoruTesti(unittest.TestCase):
                 "duzeltme_notu": "Belge tekrar kontrol edildi",
             })
             self.assertEqual(650, rapor["girdiler"]["ogrenci_sayisi"])
+            self.assertEqual("Çankaya", rapor["girdiler"]["ilce"])
             self.assertGreater(len(analiz_motoru.analiz_matematigi_olustur(rapor)), 15)
             with closing(veritabani.baglan()) as conn:
                 belge_ogrenci = conn.execute(
@@ -190,8 +192,18 @@ class AnalizMotoruTesti(unittest.TestCase):
                     "SELECT COUNT(1) FROM analiz_manuel_gecmisi WHERE aday_id=?",
                     (aday_id,),
                 ).fetchone()[0]
+                manuel_ilce = conn.execute(
+                    "SELECT ilce FROM analiz_manuel_duzeltmeleri WHERE aday_id=?",
+                    (aday_id,),
+                ).fetchone()[0]
+                ogrenme = conn.execute(
+                    "SELECT COUNT(1) FROM analiz_ogrenme_ornekleri WHERE aday_id=?",
+                    (aday_id,),
+                ).fetchone()[0]
             self.assertEqual(500, belge_ogrenci)
             self.assertEqual(1, gecmis)
+            self.assertEqual("Çankaya", manuel_ilce)
+            self.assertEqual(1, ogrenme)
             analiz_motoru.manuel_duzeltmeyi_kaldir(aday_id)
             with closing(veritabani.baglan()) as conn:
                 self.assertEqual(0, conn.execute(

@@ -25,6 +25,7 @@ from pypdf import PdfReader
 from rapidocr_onnxruntime import RapidOCR
 
 from istatistik_motoru import okul_adi_ayikla
+from analiz_ogrenme_servisi import ogrenilmis_okul_bilgisini_uygula
 from okul_adi_servisi import okul_adi_temizle
 from veritabani import baglan, ihale_tarih_siniri
 
@@ -374,6 +375,7 @@ def _analiz_verisini_yaz(
     belge_id: int,
     veri: dict[str, object],
 ) -> None:
+    veri = ogrenilmis_okul_bilgisini_uygula(conn, aday_id, veri)
     simdi = datetime.now().isoformat(timespec="seconds")
     conn.execute("""
         INSERT INTO ilan_analiz_verileri (
@@ -677,16 +679,20 @@ def yerel_arsivi_yeniden_isle(
             FROM ihale_belgeleri b
             JOIN duyuru_adaylari d ON d.id=b.aday_id
             LEFT JOIN ilan_analiz_verileri a ON a.aday_id=b.aday_id
+            LEFT JOIN analiz_manuel_duzeltmeleri m ON m.aday_id=b.aday_id
             WHERE b.yerel_yol IS NOT NULL
               AND datetime(b.son_kontrol) <= datetime(
                     'now', printf('-%d hours', ?)
                   )
               AND (
                      a.aday_id IS NULL
-                  OR NULLIF(TRIM(a.okul_adi), '') IS NULL
-                  OR NULLIF(TRIM(a.okul_turu), '') IS NULL
-                  OR a.ogrenci_sayisi IS NULL
-                  OR a.muhammen_bedel_aylik IS NULL
+                  OR NULLIF(TRIM(COALESCE(m.okul_adi, a.okul_adi)), '') IS NULL
+                  OR NULLIF(TRIM(COALESCE(m.okul_turu, a.okul_turu)), '') IS NULL
+                  OR COALESCE(m.ogrenci_sayisi, a.ogrenci_sayisi) IS NULL
+                  OR COALESCE(
+                         m.muhammen_bedel_aylik,
+                         a.muhammen_bedel_aylik
+                     ) IS NULL
               )
               AND NOT EXISTS (
                   SELECT 1
@@ -736,12 +742,16 @@ def kayitli_metinleri_yeniden_ayristir(limit: int = 50) -> dict[str, int]:
             FROM ilan_analiz_verileri a
             JOIN duyuru_adaylari d ON d.id=a.aday_id
             JOIN ihale_belgeleri b ON b.id=a.kaynak_belge_id
+            LEFT JOIN analiz_manuel_duzeltmeleri m ON m.aday_id=a.aday_id
             WHERE NULLIF(TRIM(a.ham_metin), '') IS NOT NULL
               AND (
-                     NULLIF(TRIM(a.okul_adi), '') IS NULL
-                  OR NULLIF(TRIM(a.okul_turu), '') IS NULL
-                  OR a.ogrenci_sayisi IS NULL
-                  OR a.muhammen_bedel_aylik IS NULL
+                     NULLIF(TRIM(COALESCE(m.okul_adi, a.okul_adi)), '') IS NULL
+                  OR NULLIF(TRIM(COALESCE(m.okul_turu, a.okul_turu)), '') IS NULL
+                  OR COALESCE(m.ogrenci_sayisi, a.ogrenci_sayisi) IS NULL
+                  OR COALESCE(
+                         m.muhammen_bedel_aylik,
+                         a.muhammen_bedel_aylik
+                     ) IS NULL
               )
               AND NOT EXISTS (
                   SELECT 1
@@ -768,12 +778,20 @@ def kayitli_metinleri_yeniden_ayristir(limit: int = 50) -> dict[str, int]:
             with closing(baglan()) as conn, conn:
                 _analiz_verisini_yaz(conn, aday_id, belge_id, veri)
                 birlesik = conn.execute("""
-                    SELECT NULLIF(TRIM(okul_adi), '') IS NOT NULL,
-                           NULLIF(TRIM(okul_turu), '') IS NOT NULL,
-                           ogrenci_sayisi IS NOT NULL,
-                           muhammen_bedel_aylik IS NOT NULL
-                    FROM ilan_analiz_verileri
-                    WHERE aday_id=?
+                    SELECT NULLIF(TRIM(COALESCE(m.okul_adi, a.okul_adi)), '')
+                               IS NOT NULL,
+                           NULLIF(TRIM(COALESCE(m.okul_turu, a.okul_turu)), '')
+                               IS NOT NULL,
+                           COALESCE(m.ogrenci_sayisi, a.ogrenci_sayisi)
+                               IS NOT NULL,
+                           COALESCE(
+                               m.muhammen_bedel_aylik,
+                               a.muhammen_bedel_aylik
+                           ) IS NOT NULL
+                    FROM ilan_analiz_verileri a
+                    LEFT JOIN analiz_manuel_duzeltmeleri m
+                      ON m.aday_id=a.aday_id
+                    WHERE a.aday_id=?
                 """, (aday_id,)).fetchone()
                 tamam = bool(birlesik and all(bool(deger) for deger in birlesik))
                 conn.execute("""
@@ -880,14 +898,25 @@ def arsiv_ozeti() -> dict[str, int]:
                   )
             )
             SELECT COUNT(*) AS toplam,
-                   SUM(CASE WHEN EXISTS (
-                       SELECT 1 FROM ilan_analiz_verileri a
-                       WHERE a.aday_id=h.aday_id
-                         AND NULLIF(TRIM(a.okul_adi), '') IS NOT NULL
-                         AND NULLIF(TRIM(a.okul_turu), '') IS NOT NULL
-                         AND a.ogrenci_sayisi IS NOT NULL
-                         AND a.muhammen_bedel_aylik IS NOT NULL
-                   ) THEN 1 ELSE 0 END) AS hazir
+                    SUM(CASE WHEN EXISTS (
+                        SELECT 1
+                        FROM ilan_analiz_verileri a
+                        LEFT JOIN analiz_manuel_duzeltmeleri m
+                          ON m.aday_id=a.aday_id
+                        WHERE a.aday_id=h.aday_id
+                          AND NULLIF(
+                              TRIM(COALESCE(m.okul_adi, a.okul_adi)), ''
+                          ) IS NOT NULL
+                          AND NULLIF(
+                              TRIM(COALESCE(m.okul_turu, a.okul_turu)), ''
+                          ) IS NOT NULL
+                          AND COALESCE(m.ogrenci_sayisi, a.ogrenci_sayisi)
+                              IS NOT NULL
+                          AND COALESCE(
+                              m.muhammen_bedel_aylik,
+                              a.muhammen_bedel_aylik
+                          ) IS NOT NULL
+                    ) THEN 1 ELSE 0 END) AS hazir
             FROM hedefler h
         """).fetchone()
     return {

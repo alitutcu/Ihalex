@@ -401,6 +401,8 @@ def tablo_olustur() -> None:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS analiz_manuel_duzeltmeleri (
                 aday_id INTEGER PRIMARY KEY,
+                il TEXT,
+                ilce TEXT,
                 okul_adi TEXT,
                 okul_turu TEXT,
                 ogrenci_sayisi INTEGER,
@@ -447,6 +449,8 @@ def tablo_olustur() -> None:
                 "ADD COLUMN hedef_net_kar_orani REAL"
             )
         for kolon, tanim in {
+            "il": "TEXT",
+            "ilce": "TEXT",
             "otomatik_personel_hesapla": "INTEGER",
             "manuel_calisan_sayisi": "INTEGER",
             "asgari_ucret": "NUMERIC",
@@ -490,6 +494,28 @@ def tablo_olustur() -> None:
                 islem_tarihi TEXT NOT NULL,
                 FOREIGN KEY(aday_id) REFERENCES duyuru_adaylari(id) ON DELETE CASCADE
             )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS analiz_ogrenme_ornekleri (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                aday_id INTEGER NOT NULL,
+                kaynak_id INTEGER NOT NULL,
+                belge_id INTEGER,
+                belge_degerleri_json TEXT NOT NULL,
+                dogrulanmis_degerler_json TEXT NOT NULL,
+                degisen_alanlar_json TEXT NOT NULL,
+                metin_parmak_izi TEXT,
+                duzelten TEXT NOT NULL DEFAULT 'admin',
+                olusturma_tarihi TEXT NOT NULL,
+                uygulanma_sayisi INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(aday_id) REFERENCES duyuru_adaylari(id) ON DELETE CASCADE,
+                FOREIGN KEY(kaynak_id) REFERENCES kaynaklar(id) ON DELETE CASCADE,
+                FOREIGN KEY(belge_id) REFERENCES ihale_belgeleri(id) ON DELETE SET NULL
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_analiz_ogrenme_kaynak
+            ON analiz_ogrenme_ornekleri(kaynak_id, olusturma_tarihi DESC)
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS sistem_surumleri (
@@ -581,13 +607,18 @@ def tablo_olustur() -> None:
                 son_hata='Okul adı, okul türü, öğrenci sayısı ve aylık muhammen bedel yeniden işlenecek'
             WHERE durum='analiz_edildi'
               AND EXISTS (
-                  SELECT 1 FROM ilan_analiz_verileri a
+                  SELECT 1
+                  FROM ilan_analiz_verileri a
+                  LEFT JOIN analiz_manuel_duzeltmeleri m ON m.aday_id=a.aday_id
                   WHERE a.aday_id=ihale_belgeleri.aday_id
                     AND (
-                           NULLIF(TRIM(a.okul_adi), '') IS NULL
-                        OR NULLIF(TRIM(a.okul_turu), '') IS NULL
-                        OR a.ogrenci_sayisi IS NULL
-                        OR a.muhammen_bedel_aylik IS NULL
+                           NULLIF(TRIM(COALESCE(m.okul_adi, a.okul_adi)), '') IS NULL
+                        OR NULLIF(TRIM(COALESCE(m.okul_turu, a.okul_turu)), '') IS NULL
+                        OR COALESCE(m.ogrenci_sayisi, a.ogrenci_sayisi) IS NULL
+                        OR COALESCE(
+                               m.muhammen_bedel_aylik,
+                               a.muhammen_bedel_aylik
+                           ) IS NULL
                     )
               )
         """)

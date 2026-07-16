@@ -85,6 +85,7 @@ SAYFA_ADLARI = {deger: anahtar for anahtar, deger in SAYFALAR.items()}
 BANNER_GORSELI = Path(__file__).resolve().parent / "assets" / "banner-school-cafeteria-source.jpg"
 ADMIN_OTURUM_SURESI = timedelta(hours=3)
 ADMIN_CEREZ_ADI = "ihalex_admin_oturum"
+VERITABANI_SEMA_SURUMU = "2026-07-16-manuel-konum-v2"
 
 
 @st.cache_data(show_spinner=False)
@@ -97,7 +98,8 @@ def gorsel_data_uri(dosya: str) -> str:
 
 
 @st.cache_resource(show_spinner=False)
-def veritabani_hazirla() -> None:
+def veritabani_hazirla(sema_surumu: str) -> None:
+    del sema_surumu  # Sürüm değeri Streamlit migration önbelleğini yeniler.
     tablo_olustur()
 
 
@@ -591,6 +593,120 @@ def stilleri_yukle(gomulu: bool) -> None:
             padding: .75rem .9rem .25rem;
             margin-bottom: 1rem;
         }}
+        .ihalex-index-shell {{
+            border: 1px solid rgba(17,17,17,.16);
+            border-radius: 18px;
+            background: #f8f7ef;
+            box-shadow: 0 18px 42px rgba(17,17,17,.08);
+            overflow: hidden;
+            margin-top: .55rem;
+        }}
+        .ihalex-index-head {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 14px 18px;
+            color: #FFD21F;
+            background: #111111;
+            border-bottom: 4px solid #D71920;
+        }}
+        .ihalex-index-head strong {{
+            font-size: 1rem;
+            letter-spacing: .035em;
+            text-transform: uppercase;
+        }}
+        .ihalex-index-head span {{
+            padding: 5px 10px;
+            border: 1px solid rgba(255,210,31,.48);
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 900;
+        }}
+        .ihalex-index-list {{ display: grid; gap: 0; }}
+        .ihalex-index-item {{
+            display: grid;
+            grid-template-columns: 92px minmax(0, 1fr) 170px 34px;
+            gap: 16px;
+            align-items: center;
+            min-height: 118px;
+            padding: 14px 16px;
+            color: #111111 !important;
+            text-decoration: none !important;
+            background: #ffffff;
+            border-bottom: 1px solid rgba(17,17,17,.16);
+            transition: transform .16s ease, background .16s ease;
+        }}
+        .ihalex-index-item:last-child {{ border-bottom: 0; }}
+        .ihalex-index-item:hover {{ background: #fff9d8; transform: translateX(3px); }}
+        .ihalex-index-date {{
+            display: grid;
+            place-items: center;
+            min-height: 76px;
+            padding: 8px;
+            color: #FFD21F;
+            background: #111111;
+            border-radius: 12px;
+            box-shadow: inset 0 -4px 0 #D71920;
+            text-align: center;
+        }}
+        .ihalex-index-date b {{ font-size: 1.4rem; line-height: 1; }}
+        .ihalex-index-date small {{
+            font-size: .62rem;
+            font-weight: 900;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }}
+        .ihalex-index-main {{ min-width: 0; }}
+        .ihalex-index-badge {{
+            display: inline-flex;
+            margin-bottom: 5px;
+            color: #D71920;
+            font-size: .66rem;
+            font-weight: 950;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }}
+        .ihalex-index-title {{
+            display: -webkit-box;
+            overflow: hidden;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            font-size: 1rem;
+            font-weight: 900;
+            line-height: 1.25;
+        }}
+        .ihalex-index-meta {{
+            margin-top: 7px;
+            color: #5b5a54;
+            font-size: .76rem;
+            font-weight: 700;
+        }}
+        .ihalex-index-tender {{
+            padding: 10px 12px;
+            border: 1px solid rgba(17,17,17,.14);
+            border-radius: 10px;
+            background: #f4f2e8;
+        }}
+        .ihalex-index-tender small {{
+            display: block;
+            color: #77746a;
+            font-size: .62rem;
+            font-weight: 900;
+            text-transform: uppercase;
+        }}
+        .ihalex-index-tender strong {{ font-size: .88rem; }}
+        .ihalex-index-arrow {{
+            display: grid;
+            place-items: center;
+            width: 32px;
+            height: 32px;
+            color: #ffffff;
+            background: #D71920;
+            border-radius: 50%;
+            font-size: 1rem;
+            font-weight: 950;
+        }}
         .ihalex-mobile-note {{ color: #575750; font-size: .84rem; }}
         .ihalex-footer {{
             border-top: 1px solid #d7d7ce;
@@ -719,6 +835,36 @@ def stilleri_yukle(gomulu: bool) -> None:
                 letter-spacing: .025em;
                 text-transform: uppercase;
             }}
+            .ihalex-index-head {{
+                align-items: flex-start;
+                flex-direction: column;
+                gap: .55rem;
+                padding: 12px 14px;
+            }}
+            .ihalex-index-item {{
+                grid-template-columns: 66px minmax(0, 1fr) 28px;
+                gap: 10px;
+                min-height: 104px;
+                padding: 12px 10px;
+            }}
+            .ihalex-index-date {{
+                min-height: 68px;
+                padding: 6px;
+                border-radius: 10px;
+            }}
+            .ihalex-index-date b {{ font-size: 1.18rem; }}
+            .ihalex-index-title {{ font-size: .9rem; }}
+            .ihalex-index-meta {{ font-size: .7rem; }}
+            .ihalex-index-tender {{
+                grid-column: 2;
+                padding: 6px 8px;
+            }}
+            .ihalex-index-arrow {{
+                grid-column: 3;
+                grid-row: 1 / span 2;
+                width: 28px;
+                height: 28px;
+            }}
             [data-baseweb="select"] > div, input {{ font-size: 16px !important; }}
             .js-plotly-plot, .plot-container {{ min-height: 470px !important; }}
             .st-key-ana_sayfa_harita .js-plotly-plot,
@@ -759,7 +905,10 @@ def ilan_adi_olustur(satir: pd.Series) -> str:
 def veri_getir() -> pd.DataFrame:
     sorgu = """
         WITH sirali AS (
-            SELECT d.id AS ilan_id, d.baslik, k.il, k.ilce, k.kurum_adi AS kaynak,
+            SELECT d.id AS ilan_id, d.baslik,
+                   COALESCE(NULLIF(TRIM(m.il), ''), k.il) AS il,
+                   COALESCE(NULLIF(TRIM(m.ilce), ''), k.ilce) AS ilce,
+                   k.kurum_adi AS kaynak,
                    d.yayin_tarihi, d.ihale_tarihi, d.durum,
                    CASE WHEN d.eslesme_turu='ek_dosya' THEN d.url
                         ELSE COALESCE(NULLIF(d.detay_url, ''), d.url) END AS ihale_url,
@@ -830,7 +979,9 @@ def veri_getir() -> pd.DataFrame:
             JOIN kaynaklar k ON k.id=d.kaynak_id
             LEFT JOIN ilan_analiz_verileri a ON a.aday_id=d.id
             LEFT JOIN analiz_manuel_duzeltmeleri m ON m.aday_id=d.id
-            LEFT JOIN bolge_verileri bv ON bv.il=k.il AND bv.ilce=COALESCE(k.ilce, '')
+            LEFT JOIN bolge_verileri bv
+              ON bv.il=COALESCE(NULLIF(TRIM(m.il), ''), k.il)
+             AND bv.ilce=COALESCE(NULLIF(TRIM(m.ilce), ''), k.ilce, '')
             LEFT JOIN kantin_yatirim_analizleri ka ON ka.aday_id=d.id
             WHERE d.yayin_tarihi >= ?
         )
@@ -1022,7 +1173,7 @@ def portal_satirlari_goster(veri: pd.DataFrame) -> None:
 
 def ana_sayfa_filtreleri_goster(df: pd.DataFrame) -> None:
     """Ana sayfada görünür gelişmiş filtre ve ilan sonuçlarını gösterir."""
-    df = df[(df["durum"] == "aktif") & df["analize_hazir"]].copy()
+    df = df[df["durum"] == "aktif"].copy()
     st.markdown(
         "<div class='ihalex-section-head'><h3>İhale Filtreleri ve Sonuçları</h3>"
         "<a href='?sayfa=ihaleler'>GELİŞMİŞ İLAN SAYFASI →</a></div>",
@@ -1092,13 +1243,9 @@ def ana_sayfa_filtreleri_goster(df: pd.DataFrame) -> None:
             filtre = filtre[filtre["kaynak"] == kaynak]
         with sonuc_sutunu:
             st.html("<span class='ihalex-result-column-marker'></span>")
-            r1, r2 = st.columns([2, 1])
-            siralama = r1.selectbox(
+            siralama = st.selectbox(
                 "Sıralama", ["En yeni yayın", "En yakın ihale tarihi", "Okul adına göre"],
                 key="ana_filtre_siralama",
-            )
-            gorunum = r2.segmented_control(
-                "Görünüm", ["Liste", "Kart"], default="Liste", key="ana_filtre_gorunum"
             )
             if siralama == "En yakın ihale tarihi":
                 filtre = filtre.sort_values("ihale_tarihi", na_position="last")
@@ -1106,14 +1253,16 @@ def ana_sayfa_filtreleri_goster(df: pd.DataFrame) -> None:
                 filtre = filtre.sort_values("okul_adi")
             else:
                 filtre = filtre.sort_values("yayin_tarihi", ascending=False)
-            st.caption(
-                f"12'li Aktif İlan Sonuçları · Toplam {len(filtre)} ilan · İlk 12 sonuç"
-            )
             parca = filtre.head(12)
-            if gorunum == "Kart":
-                kartlar_goster(parca, analiz_baglantisi=True)
+            if parca.empty:
+                st.info("Bu filtrelerle eşleşen aktif ihale bulunamadı.")
             else:
-                portal_satirlari_goster(parca)
+                ihale_indeksi_goster(
+                    parca,
+                    toplam=len(filtre),
+                    sayfa=1,
+                    sayfa_sayisi=max((len(filtre) + 11) // 12, 1),
+                )
 
 
 def ana_sayfa_haritasi_goster(df: pd.DataFrame) -> None:
@@ -1225,9 +1374,9 @@ def ana_sayfa(df: pd.DataFrame) -> None:
                 "İLAN ARA", type="primary", width="stretch"
             )
     toplam = len(df)
-    # Ana sayfadaki aktif sayaç, aşağıdaki sonuç tablosu ve AI kartları aynı
-    # doğrulanmış kamu görünümünü kullanır. Ham/eksik adaylar yönetimde kalır.
-    aktif = int(((df["durum"] == "aktif") & df["analize_hazir"]).sum())
+    # Aktiflik yalnız ihale tarihine bağlıdır; analiz alanlarının tamamlanması
+    # ayrı bir veri kalite durumudur ve aktif ilan sayısını azaltmaz.
+    aktif = int((df["durum"] == "aktif").sum())
     pasif = int((df["durum"] == "pasif").sum())
     bekleyen = int((df["durum"] == "tarih_bekleniyor").sum())
     st.markdown(
@@ -1267,9 +1416,7 @@ def ana_sayfa(df: pd.DataFrame) -> None:
         "<a href='?sayfa=ihaleler&durum=aktif'>TÜM AKTİF İLANLAR →</a></div>",
         unsafe_allow_html=True,
     )
-    aktifler = df[
-        (df["durum"] == "aktif") & df["analize_hazir"]
-    ].sort_values("ihale_tarihi")
+    aktifler = df[df["durum"] == "aktif"].sort_values("ihale_tarihi")
     vitrin_kartlari_goster(aktifler)
     ana_sayfa_haritasi_goster(df)
     st.markdown(
@@ -1293,74 +1440,170 @@ def ana_sayfa(df: pd.DataFrame) -> None:
     )
 
 
+def ihale_indeksi_goster(
+    veri: pd.DataFrame,
+    *,
+    toplam: int,
+    sayfa: int,
+    sayfa_sayisi: int,
+) -> None:
+    """İlanları Excel görünümü yerine erişilebilir bir portal indeksinde göster."""
+    aylar = (
+        "OCA", "ŞUB", "MAR", "NİS", "MAY", "HAZ",
+        "TEM", "AĞU", "EYL", "EKİ", "KAS", "ARA",
+    )
+    satirlar: list[str] = []
+    for _, satir in veri.iterrows():
+        yayin = pd.to_datetime(satir.get("yayin_tarihi"), errors="coerce")
+        ihale = pd.to_datetime(satir.get("ihale_tarihi"), errors="coerce")
+        gun = f"{int(yayin.day):02d}" if pd.notna(yayin) else "--"
+        ay = aylar[int(yayin.month) - 1] if pd.notna(yayin) else "TARİH"
+        yil = str(int(yayin.year)) if pd.notna(yayin) else "--"
+        ihale_metni = ihale.strftime("%d.%m.%Y") if pd.notna(ihale) else "Doğrulanıyor"
+        durum = str(satir.get("durum") or "")
+        durum_etiketi = {
+            "aktif": "AKTİF İHALE",
+            "pasif": "GEÇMİŞ İHALE",
+            "tarih_bekleniyor": "TARİH DOĞRULANIYOR",
+        }.get(durum, "MEB İHALESİ")
+        okul = str(satir.get("ilan_adi") or satir.get("baslik") or "Kantin ihalesi")
+        konum = " · ".join(
+            parca for parca in (
+                str(satir.get("il") or "").strip(),
+                str(satir.get("ilce") or "").strip(),
+                str(satir.get("kaynak") or "").strip(),
+            ) if parca
+        )
+        analize_hazir = bool(satir.get("analize_hazir"))
+        url = (
+            analiz_karti_url(satir.get("ilan_id"))
+            if analize_hazir
+            else str(satir.get("ihale_url") or "#")
+        )
+        hedef = "" if url.startswith("?") else ' target="_blank" rel="noopener"'
+        satirlar.append(f"""
+            <a class="ihalex-index-item" href="{html.escape(url, quote=True)}"{hedef}>
+              <span class="ihalex-index-date">
+                <small>{html.escape(ay)}</small><b>{html.escape(gun)}</b><small>{html.escape(yil)}</small>
+              </span>
+              <span class="ihalex-index-main">
+                <span class="ihalex-index-badge">{html.escape(durum_etiketi)}</span>
+                <span class="ihalex-index-title">{html.escape(okul)}</span>
+                <span class="ihalex-index-meta">{html.escape(konum)}</span>
+              </span>
+              <span class="ihalex-index-tender">
+                <small>İhale tarihi</small><strong>{html.escape(ihale_metni)}</strong>
+              </span>
+              <span class="ihalex-index-arrow">→</span>
+            </a>
+        """)
+    indeks_html = "".join(satirlar).replace("\n", "")
+    st.markdown(
+        f'<section class="ihalex-index-shell">'
+        f'<header class="ihalex-index-head">'
+        f'<strong>Resmî MEB Kantin İhale İndeksi</strong>'
+        f'<span>{toplam} sonuç · {sayfa}/{sayfa_sayisi}. sayfa</span>'
+        f'</header><div class="ihalex-index-list">{indeks_html}</div></section>',
+        unsafe_allow_html=True,
+    )
+
+
 def ihaleler_sayfasi(df: pd.DataFrame, gomulu: bool) -> None:
-    st.title("Tüm kantin ihale ilanları")
-    st.caption("ilan.gov.tr portal mantığından uyarlanan gelişmiş filtre ve sonuç görünümü.")
+    del gomulu
+    st.title("Kantin İhale İlanları")
+    st.caption(
+        "Resmî MEB duyurularını yer, durum ve tarihe göre filtreleyin; "
+        "ilan satırından belgeye veya hazır AI analizine ulaşın."
+    )
     with st.container(key="ihale_portali"):
-        filtre_sutunu, sonuc_sutunu = st.columns([1, 3])
-        with filtre_sutunu:
-            st.markdown("#### İlan Filtreleri")
-            kelime = st.text_input("Kelime", placeholder="Okul veya ilan adı")
-            gun = st.selectbox(
-                "Yayın dönemi", [30, 90, 180, 365], index=3,
-                format_func=lambda x: f"Son {x} gün",
-            )
-            il_secenekleri = ["Tüm Türkiye"] + sorted(df["il"].dropna().unique())
-            il_parametresi = str(st.query_params.get("il", "Tüm Türkiye"))
-            il_indeksi = (
-                il_secenekleri.index(il_parametresi)
-                if il_parametresi in il_secenekleri else 0
-            )
-            il = st.selectbox("İlan yeri", il_secenekleri, index=il_indeksi)
-            ilceler = sorted(
-                df.loc[df["il"] == il, "ilce"].replace("", pd.NA).dropna().unique()
-            )
-            ilce = st.selectbox(
-                "İlçe", ["Tüm ilçeler"] + ilceler, disabled=il == "Tüm Türkiye"
-            )
-            durum_parametresi = str(st.query_params.get("durum", "tumu"))
-            durumlar = ["Tümü", "Aktif", "Pasif", "Doğrulanıyor"]
-            varsayilan = {"aktif": 1, "pasif": 2, "bekleyen": 3}.get(durum_parametresi, 0)
-            durum = st.selectbox("İlan durumu", durumlar, index=varsayilan)
-    filtre = df[df["gun"] <= gun]
+        f1, f2, f3, f4 = st.columns([2.2, 1.15, 1.15, 1.1])
+        kelime = f1.text_input(
+            "İlanlarda ara", placeholder="Okul, ilçe veya MEB kaynağı"
+        ).strip()
+        il_secenekleri = ["Tüm Türkiye"] + sorted(df["il"].dropna().unique())
+        il_parametresi = str(st.query_params.get("il", "Tüm Türkiye"))
+        il_indeksi = il_secenekleri.index(il_parametresi) if il_parametresi in il_secenekleri else 0
+        il = f2.selectbox("İl", il_secenekleri, index=il_indeksi)
+        ilceler = sorted(
+            df.loc[df["il"] == il, "ilce"].replace("", pd.NA).dropna().unique()
+        )
+        ilce = f3.selectbox(
+            "İlçe", ["Tüm ilçeler"] + ilceler, disabled=il == "Tüm Türkiye"
+        )
+        durum_parametresi = str(st.query_params.get("durum", "tumu"))
+        durumlar = ["Tümü", "Aktif", "Pasif", "Doğrulanıyor"]
+        durum_indeksi = {"aktif": 1, "pasif": 2, "bekleyen": 3}.get(
+            durum_parametresi, 0
+        )
+        durum = f4.selectbox("Durum", durumlar, index=durum_indeksi)
+        a1, a2, a3 = st.columns([1, 1.35, 2.25])
+        gun = a1.selectbox(
+            "Yayın dönemi", [30, 90, 180, 365], index=3,
+            format_func=lambda deger: f"Son {deger} gün",
+        )
+        siralama = a2.selectbox(
+            "Sıralama", ["En yeni yayın", "En yakın ihale", "Okul adına göre"]
+        )
+        a3.markdown(
+            '<div style="height:29px"></div><div style="padding:10px 14px;'
+            'border-radius:10px;background:#111111;color:#FFD21F;font-weight:900;'
+            'font-size:.8rem;">İHALEX · RESMÎ MEB KAYNAK İNDEKSİ</div>',
+            unsafe_allow_html=True,
+        )
+
+    filtre = df[df["gun"] <= gun].copy()
     if kelime:
-        arama_alani = filtre["baslik"].fillna("") + " " + filtre["kaynak"].fillna("")
+        arama_alani = (
+            filtre["baslik"].fillna("") + " "
+            + filtre["okul_adi"].fillna("") + " "
+            + filtre["kaynak"].fillna("") + " "
+            + filtre["ilce"].fillna("")
+        )
         filtre = filtre[arama_alani.str.contains(kelime, case=False, regex=False)]
     if il != "Tüm Türkiye":
         filtre = filtre[filtre["il"] == il]
     if ilce != "Tüm ilçeler":
         filtre = filtre[filtre["ilce"] == ilce]
-    durum_kodu = {"Aktif": "aktif", "Pasif": "pasif", "Doğrulanıyor": "tarih_bekleniyor"}
+    durum_kodu = {
+        "Aktif": "aktif", "Pasif": "pasif", "Doğrulanıyor": "tarih_bekleniyor"
+    }
     if durum in durum_kodu:
         filtre = filtre[filtre["durum"] == durum_kodu[durum]]
-    if durum == "Aktif":
-        filtre = filtre[filtre["analize_hazir"]]
-    with sonuc_sutunu:
-        st.markdown("#### İlan Sonuçları")
-        ust1, ust2 = st.columns([2, 1])
-        siralama = ust1.selectbox(
-            "Sıralama", ["En yeni yayın", "En yakın ihale tarihi", "Okul adına göre"]
-        )
-        gorunum = ust2.segmented_control(
-            "Görünüm", ["Liste", "Kart"], default="Kart" if gomulu else "Liste"
-        )
-        if siralama == "En yakın ihale tarihi":
-            filtre = filtre.sort_values("ihale_tarihi", na_position="last")
-        elif siralama == "Okul adına göre":
-            filtre = filtre.sort_values("baslik")
-        else:
-            filtre = filtre.sort_values("yayin_tarihi", ascending=False)
-        sayfa_boyutu = 15 if gorunum == "Kart" else (30 if gomulu else 50)
-        sayfa_sayisi = max((len(filtre) + sayfa_boyutu - 1) // sayfa_boyutu, 1)
-        p1, p2 = st.columns([3, 1])
-        p1.caption(f"{len(filtre)} resmî ihale bulundu · Son {gun} gün")
-        sayfa = int(p2.number_input("Sayfa", 1, sayfa_sayisi, 1))
-        baslangic = (sayfa - 1) * sayfa_boyutu
-        parca = filtre.iloc[baslangic:baslangic + sayfa_boyutu]
-        if gorunum == "Kart":
-            kartlar_goster(parca)
-        else:
-            tablo_goster(parca)
+    if siralama == "En yakın ihale":
+        filtre = filtre.sort_values("ihale_tarihi", na_position="last")
+    elif siralama == "Okul adına göre":
+        filtre = filtre.sort_values("ilan_adi")
+    else:
+        filtre = filtre.sort_values("yayin_tarihi", ascending=False)
+
+    filtre_imzasi = (kelime, il, ilce, durum, gun, siralama)
+    if st.session_state.get("ihale_index_imzasi") != filtre_imzasi:
+        st.session_state["ihale_index_imzasi"] = filtre_imzasi
+        st.session_state["ihale_index_sayfa"] = 1
+    sayfa_boyutu = 12
+    sayfa_sayisi = max((len(filtre) + sayfa_boyutu - 1) // sayfa_boyutu, 1)
+    sayfa = min(max(int(st.session_state.get("ihale_index_sayfa", 1)), 1), sayfa_sayisi)
+    st.session_state["ihale_index_sayfa"] = sayfa
+    baslangic = (sayfa - 1) * sayfa_boyutu
+    parca = filtre.iloc[baslangic:baslangic + sayfa_boyutu]
+    if parca.empty:
+        st.info("Bu filtrelerle eşleşen resmî ihale bulunamadı.")
+        return
+    ihale_indeksi_goster(
+        parca, toplam=len(filtre), sayfa=sayfa, sayfa_sayisi=sayfa_sayisi
+    )
+    geri, sayfa_bilgisi, ileri = st.columns([1, 3, 1])
+    if geri.button("← Önceki", disabled=sayfa <= 1, width="stretch"):
+        st.session_state["ihale_index_sayfa"] = sayfa - 1
+        st.rerun()
+    sayfa_bilgisi.markdown(
+        f"<div style='text-align:center;padding:10px;font-weight:900'>"
+        f"Sayfa {sayfa} / {sayfa_sayisi}</div>",
+        unsafe_allow_html=True,
+    )
+    if ileri.button("Sonraki →", disabled=sayfa >= sayfa_sayisi, width="stretch"):
+        st.session_state["ihale_index_sayfa"] = sayfa + 1
+        st.rerun()
 
 
 def istatistik_sayfasi(df: pd.DataFrame) -> None:
@@ -2054,10 +2297,22 @@ def meb_kaynak_listesi_goster() -> None:
 
 @st.cache_data(ttl=30, show_spinner=False)
 def ai_yonetim_verileri_getir() -> pd.DataFrame:
+    # Kamusal sayfadaki mantıksal ilan kimliklerini kullan: detay sayfası ve ek
+    # dosya aynı ihaleyi temsil ettiğinde yönetimde ikinci bir satır oluşmasın.
+    # Analiz kaydı olmayan aktif ilanlar ise manuel tamamlama için mutlaka kalsın.
+    kamusal_veri = veri_getir()
+    if kamusal_veri.empty:
+        return pd.DataFrame()
+    kamusal_adaylar = set(
+        pd.to_numeric(kamusal_veri["ilan_id"], errors="coerce").dropna().astype(int)
+    )
     try:
         with sqlite3.connect(DB) as conn:
-            return pd.read_sql_query("""
-                SELECT d.id AS aday_id, d.durum, k.il, COALESCE(k.ilce, '') AS ilce,
+            veri = pd.read_sql_query("""
+                SELECT d.id AS aday_id, d.baslik, d.durum,
+                       d.yayin_tarihi, d.ihale_tarihi,
+                       COALESCE(NULLIF(TRIM(m.il), ''), k.il) AS il,
+                       COALESCE(NULLIF(TRIM(m.ilce), ''), k.ilce, '') AS ilce,
                        COALESCE(
                            (SELECT b.url
                               FROM ihale_belgeleri b
@@ -2070,9 +2325,16 @@ def ai_yonetim_verileri_getir() -> pd.DataFrame:
                                       END,
                                       b.id DESC
                              LIMIT 1),
-                           NULLIF(TRIM(d.detay_url), ''),
-                           NULLIF(TRIM(d.url), '')
+                           CASE WHEN LOWER(COALESCE(d.url, '')) LIKE '%meb_iys_dosyalar%'
+                                THEN NULLIF(TRIM(d.url), '') END
                        ) AS resmi_belge_url,
+                       CASE
+                           WHEN LOWER(COALESCE(d.detay_url, '')) LIKE '%/www/%/icerik/%'
+                               THEN d.detay_url
+                           WHEN LOWER(COALESCE(d.url, '')) LIKE '%/www/%/icerik/%'
+                               THEN d.url
+                           ELSE COALESCE(NULLIF(TRIM(d.liste_url), ''), k.url)
+                       END AS duyuru_sayfasi_url,
                        a.okul_adi AS belge_okul_adi, a.okul_turu AS belge_okul_turu,
                        a.ogrenci_sayisi AS belge_ogrenci_sayisi,
                        a.personel_sayisi AS belge_personel_sayisi,
@@ -2125,7 +2387,11 @@ def ai_yonetim_verileri_getir() -> pd.DataFrame:
                        COALESCE(m.yol_maliyeti, 0) AS yol_maliyeti,
                        COALESCE(m.diger_yan_haklar, 0) AS diger_yan_haklar,
                        COALESCE(m.duzeltme_notu, '') AS duzeltme_notu,
-                       CASE WHEN m.aday_id IS NULL THEN 'Belge' ELSE 'Manuel' END AS veri_kaynagi,
+                       CASE
+                           WHEN m.aday_id IS NOT NULL THEN 'Manuel'
+                           WHEN a.aday_id IS NOT NULL THEN 'Belge'
+                           ELSE 'Manuel görev'
+                       END AS veri_kaynagi,
                        y.tahmini_aylik_ciro, y.tahmini_yillik_ciro,
                        y.tahmini_net_kar,
                        y.kira_ciro_orani, y.risk_skoru, y.risk_seviyesi,
@@ -2144,10 +2410,11 @@ def ai_yonetim_verileri_getir() -> pd.DataFrame:
                 LEFT JOIN ilan_analiz_verileri a ON a.aday_id=d.id
                 LEFT JOIN analiz_manuel_duzeltmeleri m ON m.aday_id=d.id
                 LEFT JOIN kantin_yatirim_analizleri y ON y.aday_id=d.id
-                WHERE a.aday_id IS NOT NULL OR m.aday_id IS NOT NULL
+                WHERE d.yayin_tarihi >= ? OR d.durum='aktif'
                 ORDER BY CASE d.durum WHEN 'aktif' THEN 0 ELSE 1 END,
                          d.yayin_tarihi DESC, d.id DESC
-            """, conn)
+            """, conn, params=(ihale_tarih_siniri().isoformat(),))
+        return veri[veri["aday_id"].isin(kamusal_adaylar)].reset_index(drop=True)
     except (sqlite3.Error, pd.errors.DatabaseError):
         logging.exception("AI yönetim verileri okunamadı")
         return pd.DataFrame()
@@ -2165,6 +2432,8 @@ def _editor_degeri_esit(sol: object, sag: object) -> bool:
 def _zorunlu_alan_durumlarini_ekle(veri: pd.DataFrame) -> pd.DataFrame:
     """Yönetim tablosunda zorunlu alanların doluluk durumunu görünür kıl."""
     sonuc = veri.copy()
+    il_tam = sonuc["il"].fillna("").astype(str).str.strip().ne("")
+    ilce_tam = sonuc["ilce"].fillna("").astype(str).str.strip().ne("")
     okul_adi_tam = sonuc["okul_adi"].fillna("").astype(str).str.strip().ne("")
     okul_turu_tam = sonuc["okul_turu"].fillna("").astype(str).str.strip().ne("")
     ogrenci_tam = pd.to_numeric(
@@ -2173,13 +2442,18 @@ def _zorunlu_alan_durumlarini_ekle(veri: pd.DataFrame) -> pd.DataFrame:
     muhammen_tam = pd.to_numeric(
         sonuc["muhammen_bedel_aylik"], errors="coerce"
     ).fillna(0).gt(0)
-    tumu_tam = okul_adi_tam & okul_turu_tam & ogrenci_tam & muhammen_tam
+    tumu_tam = (
+        il_tam & ilce_tam & okul_adi_tam & okul_turu_tam & ogrenci_tam
+        & muhammen_tam
+    )
 
     sonuc.insert(1, "zorunlu_alan_durumu", tumu_tam.map({
         True: "🟢 Tamam",
         False: "🔴 Eksik",
     }))
     kontroller = (
+        ("il_kontrol", il_tam),
+        ("ilce_kontrol", ilce_tam),
         ("okul_adi_kontrol", okul_adi_tam),
         ("okul_turu_kontrol", okul_turu_tam),
         ("ogrenci_kontrol", ogrenci_tam),
@@ -2187,8 +2461,26 @@ def _zorunlu_alan_durumlarini_ekle(veri: pd.DataFrame) -> pd.DataFrame:
     )
     for kolon, kontrol in kontroller:
         sonuc[kolon] = kontrol.map({True: "🟢", False: "🔴"})
+    sonuc["eksik_alanlar"] = [
+        ", ".join(
+            alan
+            for alan, dolu in (
+                ("İl", il_tam.iloc[sira]),
+                ("İlçe", ilce_tam.iloc[sira]),
+                ("Okul adı", okul_adi_tam.iloc[sira]),
+                ("Okul türü", okul_turu_tam.iloc[sira]),
+                ("Öğrenci", ogrenci_tam.iloc[sira]),
+                ("Aylık muhammen", muhammen_tam.iloc[sira]),
+            )
+            if not dolu
+        )
+        for sira in range(len(sonuc))
+    ]
     sonuc["resmi_belge_url"] = sonuc["resmi_belge_url"].where(
         sonuc["resmi_belge_url"].map(resmi_meb_url), None
+    )
+    sonuc["duyuru_sayfasi_url"] = sonuc["duyuru_sayfasi_url"].where(
+        sonuc["duyuru_sayfasi_url"].map(resmi_meb_url), None
     )
     return sonuc
 
@@ -2199,23 +2491,66 @@ def ai_analiz_yonetimi_goster() -> None:
         "🟢 zorunlu alan dolu, 🔴 tamamlanması gerekiyor. Sarı sütunlar yönetici "
         "girdisidir. Resmî MEB belgesi doğrudan satırdan açılır. Kaydetme işlemi "
         "belge verisini değiştirmez; ayrı düzeltme ve denetim geçmişi oluşturup "
-        "tüm matematiği yeniden hesaplar."
+        "tüm matematiği yeniden hesaplar. Belge ve duyuru sayfası ayrı "
+        "bağlantılarla doğrulanabilir."
     )
     veri = ai_yonetim_verileri_getir()
     if veri.empty:
         st.info("Yönetilecek analiz kaydı bulunamadı.")
         return
     veri = _zorunlu_alan_durumlarini_ekle(veri)
+    aktif_mi = veri["durum"].eq("aktif")
+    tamam_mi = veri["zorunlu_alan_durumu"].eq("🟢 Tamam")
+    o1, o2, o3 = st.columns(3)
+    o1.metric("Aktif mantıksal ilan", int(aktif_mi.sum()))
+    o2.metric("Aktif ve analize hazır", int((aktif_mi & tamam_mi).sum()))
+    o3.metric("Aktif ve tamamlanacak", int((aktif_mi & ~tamam_mi).sum()))
+    gorevler = veri[aktif_mi & ~tamam_mi].copy()
+    if not gorevler.empty:
+        gorevler["ihale_tarihi"] = pd.to_datetime(
+            gorevler["ihale_tarihi"], errors="coerce"
+        )
+        gorevler = gorevler.sort_values(
+            ["ihale_tarihi", "aday_id"], na_position="last"
+        )
+        ilk_gorev = gorevler.iloc[0]
+        tarih = ilk_gorev["ihale_tarihi"]
+        tarih_metni = (
+            tarih.strftime("%d.%m.%Y") if pd.notna(tarih) else "Tarih doğrulanacak"
+        )
+        st.markdown(
+            f"""
+            <a href="#ai-mudahale-tablosu" style="text-decoration:none;color:inherit;">
+              <div style="background:#111111;border:2px solid #D71920;border-left:10px solid #FFD21F;
+                          border-radius:12px;padding:13px 16px;margin:10px 0 18px;display:flex;
+                          align-items:center;gap:16px;box-shadow:0 7px 20px rgba(17,17,17,.15);">
+                <span style="background:#D71920;color:white;font-weight:900;font-size:.72rem;
+                             letter-spacing:.08em;padding:6px 9px;border-radius:6px;white-space:nowrap;">
+                  MANUEL KONTROL HATIRLATICISI
+                </span>
+                <span style="color:white;flex:1;font-size:.9rem;line-height:1.35;">
+                  <strong style="color:#FFD21F;font-size:1.08rem;">{len(gorevler)} açık görev</strong>
+                  · En yakın: #{int(ilk_gorev['aday_id'])} · {html.escape(tarih_metni)}<br>
+                  <span style="color:#d6d6d6;">Eksik: {html.escape(str(ilk_gorev['eksik_alanlar']))}</span>
+                </span>
+                <span style="color:#FFD21F;font-weight:900;white-space:nowrap;">Müdahale tablosuna git ↓</span>
+              </div>
+            </a>
+            """,
+            unsafe_allow_html=True,
+        )
     f1, f2, f3, f4 = st.columns([2, 1, 1, 1])
     arama = f1.text_input(
         "Analiz tablosunda ara", placeholder="Okul, il veya ilçe", key="ai_yonetim_ara"
     ).strip()
     durum = f2.selectbox(
         "İlan durumu", ["Tümü", "Aktif", "Pasif", "Tarih incelemede"],
+        index=1,
         key="ai_yonetim_durum",
     )
     kaynak = f3.selectbox(
-        "Veri kaynağı", ["Tümü", "Belge", "Manuel"], key="ai_yonetim_kaynak"
+        "Veri kaynağı", ["Tümü", "Belge", "Manuel", "Manuel görev"],
+        key="ai_yonetim_kaynak"
     )
     tamamlananlari_goster = f4.toggle(
         "Tamamlananları göster",
@@ -2244,8 +2579,9 @@ def ai_analiz_yonetimi_goster() -> None:
         return
 
     editor_kolonlari = [
-        "aday_id", "zorunlu_alan_durumu", "durum", "il", "ilce",
-        "resmi_belge_url", "veri_kaynagi",
+        "aday_id", "zorunlu_alan_durumu", "durum",
+        "il_kontrol", "il", "ilce_kontrol", "ilce",
+        "resmi_belge_url", "duyuru_sayfasi_url", "veri_kaynagi",
         "okul_adi_kontrol", "okul_adi",
         "okul_turu_kontrol", "okul_turu",
         "ogrenci_kontrol", "ogrenci_sayisi", "personel_sayisi",
@@ -2266,13 +2602,15 @@ def ai_analiz_yonetimi_goster() -> None:
         "tahmini_net_kar", "kira_ciro_orani",
         "risk_skoru", "risk_seviyesi", "yatirim_skoru", "maksimum_teklif",
     ]
+    st.markdown('<div id="ai-mudahale-tablosu"></div>', unsafe_allow_html=True)
     duzenlenen = st.data_editor(
         gorunen[editor_kolonlari],
         width="stretch", height=620, hide_index=True, num_rows="fixed",
         disabled=[
-            "aday_id", "zorunlu_alan_durumu", "durum", "il", "ilce",
-            "resmi_belge_url", "veri_kaynagi",
-            "okul_adi_kontrol", "okul_turu_kontrol", "ogrenci_kontrol",
+            "aday_id", "zorunlu_alan_durumu", "durum",
+            "resmi_belge_url", "duyuru_sayfasi_url", "veri_kaynagi",
+            "il_kontrol", "ilce_kontrol", "okul_adi_kontrol",
+            "okul_turu_kontrol", "ogrenci_kontrol",
             "muhammen_kontrol",
             "muhammen_bedel_yillik", "tahmini_aylik_ciro",
             "tahmini_yillik_ciro", "tahmini_net_kar",
@@ -2289,11 +2627,22 @@ def ai_analiz_yonetimi_goster() -> None:
                 "Zorunlu alanlar",
                 help="Tüm zorunlu alanlar doluysa yeşil; tamamlanması gereken alan varsa kırmızı.",
             ),
-            "durum": "Durum", "il": "İl", "ilce": "İlçe",
+            "durum": "Durum",
+            "il_kontrol": st.column_config.TextColumn("İl"),
+            "il": st.column_config.SelectboxColumn(
+                "İl", options=IL_ADLARI, required=True,
+            ),
+            "ilce_kontrol": st.column_config.TextColumn("İlçe"),
+            "ilce": st.column_config.TextColumn("İlçe", required=True),
             "resmi_belge_url": st.column_config.LinkColumn(
                 "Resmî MEB belgesi",
                 display_text="Belgeyi aç",
                 help="Yalnızca meb.gov.tr alan adındaki resmî kaynaklar gösterilir.",
+            ),
+            "duyuru_sayfasi_url": st.column_config.LinkColumn(
+                "MEB duyuru sayfası",
+                display_text="Duyuruyu aç",
+                help="Belgenin yayımlandığı resmî MEB duyuru veya duyuru listesi.",
             ),
             "veri_kaynagi": "Girdi kaynağı",
             "okul_adi_kontrol": st.column_config.TextColumn("Ad"),
@@ -2397,7 +2746,8 @@ def ai_analiz_yonetimi_goster() -> None:
         degisen = 0
         hatalar: list[str] = []
         giris_alanlari = [
-            "okul_adi", "okul_turu", "ogrenci_sayisi", "personel_sayisi",
+            "il", "ilce", "okul_adi", "okul_turu",
+            "ogrenci_sayisi", "personel_sayisi",
             "muhammen_bedel_aylik", "ogrenci_donusum_orani",
             "gunluk_ogrenci_harcamasi", "yillik_egitim_gunu",
             "hedef_net_kar_yuzde", "duzeltme_notu",
@@ -2623,7 +2973,7 @@ def yonetim_sayfasi() -> None:
 
 
 def uygulama() -> None:
-    veritabani_hazirla()
+    veritabani_hazirla(VERITABANI_SEMA_SURUMU)
     gomulu = str(st.query_params.get("embedded", "0")) == "1"
     stilleri_yukle(gomulu)
     banner_foto = gorsel_data_uri(str(BANNER_GORSELI))

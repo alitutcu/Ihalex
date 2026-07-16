@@ -18,6 +18,7 @@ from personel_maliyet_servisi import (
     VARSAYILAN_PERSONEL_PARAMETRELERI,
     personel_maliyet_raporu_olustur,
 )
+from analiz_ogrenme_servisi import ogrenme_ornegi_kaydet
 from okul_adi_servisi import okul_adi_temizle
 
 
@@ -849,7 +850,9 @@ def _etkin_analiz_girdisi_getir(aday_id: int) -> tuple[dict[str, object], dict[s
 
     with closing(baglan()) as conn:
         satir = conn.execute("""
-            SELECT d.id AS aday_id, k.il, k.ilce,
+            SELECT d.id AS aday_id,
+                   COALESCE(NULLIF(TRIM(m.il), ''), k.il) AS il,
+                   COALESCE(NULLIF(TRIM(m.ilce), ''), k.ilce) AS ilce,
                    COALESCE(NULLIF(TRIM(m.okul_adi), ''), a.okul_adi) AS okul_adi,
                    COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu) AS okul_turu,
                    COALESCE(m.ogrenci_sayisi, a.ogrenci_sayisi) AS ogrenci_sayisi,
@@ -912,6 +915,21 @@ def manuel_duzeltme_kaydet(
     from veritabani import baglan, tablo_olustur
 
     tablo_olustur()
+    with closing(baglan()) as conn:
+        kaynak_konumu = conn.execute("""
+            SELECT k.il, COALESCE(k.ilce, '') AS ilce
+            FROM duyuru_adaylari d
+            JOIN kaynaklar k ON k.id=d.kaynak_id
+            WHERE d.id=?
+        """, (int(aday_id),)).fetchone()
+    if kaynak_konumu is None:
+        raise AnalizVerisiHatasi("İlan kaydı bulunamadı")
+    il = str(duzeltme.get("il") or kaynak_konumu["il"] or "").strip()
+    ilce = str(duzeltme.get("ilce") or kaynak_konumu["ilce"] or "").strip()
+    if not il:
+        raise AnalizVerisiHatasi("İl boş bırakılamaz")
+    if not ilce:
+        raise AnalizVerisiHatasi("İlçe boş bırakılamaz")
     okul_adi = okul_adi_temizle(duzeltme.get("okul_adi")) or ""
     if not okul_adi:
         raise AnalizVerisiHatasi("Okul adı boş bırakılamaz")
@@ -1007,6 +1025,8 @@ def manuel_duzeltme_kaydet(
     )
     simdi = datetime.now().isoformat(timespec="seconds")
     yeni = {
+        "il": il,
+        "ilce": ilce,
         "okul_adi": okul_adi,
         "okul_turu": tur_etiketi,
         "ogrenci_sayisi": ogrenci,
@@ -1039,7 +1059,8 @@ def manuel_duzeltme_kaydet(
         onceki = dict(onceki_satir) if onceki_satir else None
         conn.execute("""
             INSERT INTO analiz_manuel_duzeltmeleri(
-                aday_id, okul_adi, okul_turu, ogrenci_sayisi, personel_sayisi,
+                aday_id, il, ilce, okul_adi, okul_turu,
+                ogrenci_sayisi, personel_sayisi,
                 muhammen_bedel_aylik, muhammen_bedel_yillik,
                 ogrenci_donusum_orani, ortalama_ogrenci_harcamasi,
                 yillik_egitim_gunu, hedef_net_kar_orani,
@@ -1052,9 +1073,10 @@ def manuel_duzeltme_kaydet(
                 duzeltme_notu, duzelten, olusturma_tarihi, guncelleme_tarihi
             ) VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             ON CONFLICT(aday_id) DO UPDATE SET
+                il=excluded.il, ilce=excluded.ilce,
                 okul_adi=excluded.okul_adi, okul_turu=excluded.okul_turu,
                 ogrenci_sayisi=excluded.ogrenci_sayisi,
                 personel_sayisi=excluded.personel_sayisi,
@@ -1080,7 +1102,8 @@ def manuel_duzeltme_kaydet(
                 duzelten=excluded.duzelten,
                 guncelleme_tarihi=excluded.guncelleme_tarihi
         """, (
-            int(aday_id), yeni["okul_adi"], yeni["okul_turu"],
+            int(aday_id), yeni["il"], yeni["ilce"],
+            yeni["okul_adi"], yeni["okul_turu"],
             yeni["ogrenci_sayisi"], yeni["personel_sayisi"],
             yeni["muhammen_bedel_aylik"], yeni["muhammen_bedel_yillik"],
             yeni["ogrenci_donusum_orani"], yeni["ortalama_ogrenci_harcamasi"],
@@ -1103,6 +1126,18 @@ def manuel_duzeltme_kaydet(
             int(aday_id), json.dumps(onceki, ensure_ascii=False) if onceki else None,
             json.dumps(yeni, ensure_ascii=False), str(duzelten or "admin")[:80], simdi,
         ))
+        ogrenme_ornegi_kaydet(
+            conn,
+            int(aday_id),
+            yeni,
+            duzelten=str(duzelten or "admin"),
+            olusturma_tarihi=simdi,
+        )
+        conn.execute("""
+            UPDATE ihale_belgeleri
+            SET durum='analiz_edildi', son_hata=NULL, son_kontrol=?
+            WHERE aday_id=?
+        """, (simdi, int(aday_id)))
     girdi, parametreler = _etkin_analiz_girdisi_getir(aday_id)
     rapor = analiz_raporu_olustur(girdi, parametreler)
     analizi_kaydet(aday_id, rapor)
@@ -1136,6 +1171,24 @@ def manuel_duzeltmeyi_kaldir(
             int(aday_id), json.dumps(onceki, ensure_ascii=False) if onceki else None,
             str(duzelten or "admin")[:80], simdi,
         ))
+        conn.execute("""
+            UPDATE ihale_belgeleri
+            SET durum='analiz_bekliyor',
+                son_hata='Manuel doğrulama kaldırıldı; zorunlu belge alanları yeniden işlenecek',
+                son_kontrol=?
+            WHERE aday_id=?
+              AND EXISTS (
+                  SELECT 1
+                  FROM ilan_analiz_verileri a
+                  WHERE a.aday_id=?
+                    AND (
+                           NULLIF(TRIM(a.okul_adi), '') IS NULL
+                        OR NULLIF(TRIM(a.okul_turu), '') IS NULL
+                        OR a.ogrenci_sayisi IS NULL
+                        OR a.muhammen_bedel_aylik IS NULL
+                    )
+              )
+        """, (simdi, int(aday_id), int(aday_id)))
     try:
         girdi, parametreler = _etkin_analiz_girdisi_getir(aday_id)
         rapor = analiz_raporu_olustur(girdi, parametreler)
