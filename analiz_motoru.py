@@ -22,7 +22,7 @@ from analiz_ogrenme_servisi import ogrenme_ornegi_kaydet
 from okul_adi_servisi import okul_adi_temizle
 
 
-MOTOR_SURUMU = "1.1.5"
+MOTOR_SURUMU = "1.1.7"
 OKUL_TURU_HARCAMA_KATSAYILARI = {
     "ilkokul": 0.80,
     "ortaokul": 1.00,
@@ -60,6 +60,9 @@ VARSAYILAN_PARAMETRELER = {
     "aylik_diger_gider": 5_000.0,
     "hedef_net_kar_orani": 0.25,
     "azami_kira_ciro_orani": 0.20,
+    # Muhammen bedel başlangıç fiyatıdır. Skorlamada ihale sonucunun,
+    # önerilen azami kiranın bu oranına yaklaşacağı varsayılır.
+    "tahmini_ihale_azami_orani": 0.80,
     "ekonomik_katsayi": 1.0,
     "gelir_katsayi": 1.0,
     "ticari_hareketlilik_katsayi": 1.0,
@@ -453,7 +456,10 @@ def analiz_raporu_olustur(
         gelir_katsayi=float(ayarlar["gelir_katsayi"]),
         ticari_hareketlilik_katsayi=float(ayarlar["ticari_hareketlilik_katsayi"]),
     )
-    gider = gider_hesapla(
+    # Muhammen bedel yalnızca ihalenin başlangıç senaryosudur. Azami teklif,
+    # kiradan bağımsız giderler üzerinden üretildiği için önce bu gider tabanı
+    # hesaplanır; yatırım skoru ise aşağıdaki tahmini ihale sonucu kirasını kullanır.
+    muhammen_gider = gider_hesapla(
         ciro["tahmini_aylik_ciro"],
         aylik_kira,
         urun_maliyet_orani=float(ayarlar["urun_maliyet_orani"]),
@@ -464,8 +470,41 @@ def analiz_raporu_olustur(
         fire_orani=float(ayarlar["fire_orani"]),
         aylik_diger_gider=float(ayarlar["aylik_diger_gider"]),
     )
+    maksimum = maksimum_teklif_hesapla(
+        ciro["tahmini_aylik_ciro"],
+        muhammen_gider["kira_haric_gider"],
+        hedef_net_kar_orani=float(ayarlar["hedef_net_kar_orani"]),
+        azami_kira_ciro_orani=float(ayarlar["azami_kira_ciro_orani"]),
+    )
+    tahmini_ihale_azami_orani = _oran(
+        ayarlar["tahmini_ihale_azami_orani"],
+        "Tahmini ihale sonucu / azami kira oranı",
+    )
+    tahmini_ihale_sonucu_kira = round(
+        max(aylik_kira, maksimum * tahmini_ihale_azami_orani),
+        2,
+    )
+    gider = gider_hesapla(
+        ciro["tahmini_aylik_ciro"],
+        tahmini_ihale_sonucu_kira,
+        urun_maliyet_orani=float(ayarlar["urun_maliyet_orani"]),
+        aylik_calisan_gideri=float(
+            personel_maliyet_analizi["toplam_personel_gideri"]
+        ),
+        aylik_elektrik_su_gideri=float(ayarlar["aylik_elektrik_su_gideri"]),
+        fire_orani=float(ayarlar["fire_orani"]),
+        aylik_diger_gider=float(ayarlar["aylik_diger_gider"]),
+    )
+    muhammen_sonrasi_net_kar = net_kar_hesapla(
+        ciro["tahmini_aylik_ciro"], muhammen_gider["toplam_gider"]
+    )
+    muhammen_kira_orani = kira_orani_hesapla(
+        aylik_kira, ciro["tahmini_aylik_ciro"]
+    )
     net_kar = net_kar_hesapla(ciro["tahmini_aylik_ciro"], gider["toplam_gider"])
-    kira_orani = kira_orani_hesapla(aylik_kira, ciro["tahmini_aylik_ciro"])
+    kira_orani = kira_orani_hesapla(
+        tahmini_ihale_sonucu_kira, ciro["tahmini_aylik_ciro"]
+    )
     net_marj = round(net_kar / ciro["tahmini_aylik_ciro"] * 100, 2)
     eksik = sum(_eksik_mi(ilan.get(alan)) for alan in (
         "personel_sayisi", "kantin_alani_m2"
@@ -490,11 +529,13 @@ def analiz_raporu_olustur(
         ticari_hareketlilik_katsayi=float(ayarlar["ticari_hareketlilik_katsayi"]),
     )
     yatirim_skoru = int(yatirim_detayi["yatirim_skoru"])
-    maksimum = maksimum_teklif_hesapla(
-        ciro["tahmini_aylik_ciro"],
-        gider["kira_haric_gider"],
-        hedef_net_kar_orani=float(ayarlar["hedef_net_kar_orani"]),
-        azami_kira_ciro_orani=float(ayarlar["azami_kira_ciro_orani"]),
+    azami_kira_sonrasi_net_kar = round(
+        ciro["tahmini_aylik_ciro"] - gider["kira_haric_gider"] - maksimum,
+        2,
+    )
+    azami_kira_sonrasi_net_kar_marji = round(
+        azami_kira_sonrasi_net_kar / ciro["tahmini_aylik_ciro"] * 100,
+        2,
     )
     yorum = _yorum_olustur(yatirim_skoru, str(risk["risk"]), kira_orani, net_kar)
     return {
@@ -509,7 +550,15 @@ def analiz_raporu_olustur(
         "net_kar": net_kar,
         "net_kar_marji": net_marj,
         "kira_orani": kira_orani,
+        "muhammen_sonrasi_net_kar": muhammen_sonrasi_net_kar,
+        "muhammen_kira_orani": muhammen_kira_orani,
+        "tahmini_ihale_sonucu_kira": tahmini_ihale_sonucu_kira,
+        "tahmini_ihale_azami_orani": tahmini_ihale_azami_orani,
+        "tahmini_ihale_sonrasi_net_kar": net_kar,
+        "tahmini_ihale_sonrasi_net_kar_marji": net_marj,
         "maksimum_kira": maksimum,
+        "azami_kira_sonrasi_net_kar": azami_kira_sonrasi_net_kar,
+        "azami_kira_sonrasi_net_kar_marji": azami_kira_sonrasi_net_kar_marji,
         "gunluk_musteri": ciro["gunluk_musteri"],
         "onerilen_calisan_sayisi": personel_maliyet_analizi[
             "onerilen_calisan_sayisi"
@@ -524,6 +573,7 @@ def analiz_raporu_olustur(
         "ogrenci_harcama_katsayisi": ciro["ogrenci_harcama_katsayisi"],
         "yorum": yorum,
         "ciro_detayi": ciro,
+        "muhammen_gider_detayi": muhammen_gider,
         "gider_detayi": gider,
         "personel_maliyet_analizi": personel_maliyet_analizi,
         "risk_detayi": risk,
@@ -543,6 +593,20 @@ def analiz_raporu_olustur(
                 2,
             ),
             "secilen_tavan": maksimum,
+            "azami_kira_sonrasi_net_kar": azami_kira_sonrasi_net_kar,
+            "azami_kira_sonrasi_net_kar_marji": azami_kira_sonrasi_net_kar_marji,
+        },
+        "ihale_sonucu_detayi": {
+            "muhammen_baslangic_bedeli": aylik_kira,
+            "onerilen_azami_kira": maksimum,
+            "tahmini_ihale_azami_orani": tahmini_ihale_azami_orani,
+            "azami_kiranin_oransal_tahmini": round(
+                maksimum * tahmini_ihale_azami_orani, 2
+            ),
+            "tahmini_ihale_sonucu_kira": tahmini_ihale_sonucu_kira,
+            "muhammen_alt_siniri_uygulandi": bool(
+                aylik_kira > maksimum * tahmini_ihale_azami_orani
+            ),
         },
         "girdiler": {
             "ogrenci_sayisi": int(ogrenci),
@@ -583,7 +647,9 @@ def analiz_raporu_olustur(
         },
         "uyari": (
             "Bu rapor belge verileri ve değiştirilebilir varsayımlarla üretilmiş tahmindir; "
-            "yatırım tavsiyesi değildir. Muhammen bedel aylık kira kabul edilmiştir."
+            "yatırım tavsiyesi değildir. Muhammen bedel ihalenin başlangıç bedelidir; "
+            "skor, önerilen azami kiranın varsayılan %80'i olan tahmini ihale sonucu "
+            "üzerinden hesaplanır ve bu sonuç muhammen bedelden düşük olamaz."
         ),
     }
 
@@ -593,7 +659,9 @@ def analiz_matematigi_olustur(rapor: Mapping[str, object]) -> list[dict[str, obj
     girdi = dict(rapor.get("girdiler", {}))
     varsayim = dict(rapor.get("varsayimlar", {}))
     ciro = dict(rapor.get("ciro_detayi", {}))
+    muhammen_gider = dict(rapor.get("muhammen_gider_detayi", {}))
     gider = dict(rapor.get("gider_detayi", {}))
+    ihale_sonucu = dict(rapor.get("ihale_sonucu_detayi", {}))
     okul = dict(rapor.get("okul_turu_analizi", {}))
     personel_maliyeti = dict(rapor.get("personel_maliyet_analizi", {}))
     adimlar: list[dict[str, object]] = [
@@ -688,8 +756,28 @@ def analiz_matematigi_olustur(rapor: Mapping[str, object]) -> list[dict[str, obj
             "Sonuç": float(personel_maliyeti.get("toplam_personel_gideri", 0)),
         },
         {
-            "Aşama": "Toplam gider",
-            "Formül": "Ürün + personel + elektrik/su + fire + diğer + aylık kira",
+            "Aşama": "Muhammen başlangıç bedelinde net kâr",
+            "Formül": "Aylık ciro − kira hariç gider − muhammen başlangıç bedeli",
+            "Hesap": (
+                f"{float(ciro.get('tahmini_aylik_ciro', 0)):.2f} − "
+                f"{float(muhammen_gider.get('kira_haric_gider', 0)):.2f} − "
+                f"{float(girdi.get('aylik_kira', 0)):.2f}"
+            ),
+            "Sonuç": float(rapor.get("muhammen_sonrasi_net_kar", 0)),
+        },
+        {
+            "Aşama": "Tahmini ihale sonucu kira",
+            "Formül": "max(muhammen başlangıç, önerilen azami kira × ihale sonuç oranı)",
+            "Hesap": (
+                f"max({float(ihale_sonucu.get('muhammen_baslangic_bedeli', 0)):.2f}, "
+                f"{float(ihale_sonucu.get('onerilen_azami_kira', 0)):.2f} × "
+                f"{float(ihale_sonucu.get('tahmini_ihale_azami_orani', 0)):.2f})"
+            ),
+            "Sonuç": float(rapor.get("tahmini_ihale_sonucu_kira", 0)),
+        },
+        {
+            "Aşama": "Toplam gider · tahmini ihale sonucu",
+            "Formül": "Ürün + personel + elektrik/su + fire + diğer + tahmini ihale kirası",
             "Hesap": " + ".join(
                 f"{float(gider.get(alan, 0)):.2f}" for alan in (
                     "urun_maliyeti", "personel_gideri", "elektrik_su_gideri",
@@ -699,8 +787,8 @@ def analiz_matematigi_olustur(rapor: Mapping[str, object]) -> list[dict[str, obj
             "Sonuç": float(gider.get("toplam_gider", 0)),
         },
         {
-            "Aşama": "Net kâr",
-            "Formül": "Aylık ciro − toplam gider",
+            "Aşama": "Tahmini ihale sonrası net kâr",
+            "Formül": "Aylık ciro − tahmini ihale sonucu toplam gider",
             "Hesap": (
                 f"{float(rapor.get('tahmini_ciro', 0)):.2f} − "
                 f"{float(gider.get('toplam_gider', 0)):.2f}"
@@ -708,10 +796,10 @@ def analiz_matematigi_olustur(rapor: Mapping[str, object]) -> list[dict[str, obj
             "Sonuç": float(rapor.get("net_kar", 0)),
         },
         {
-            "Aşama": "Kira / ciro oranı",
-            "Formül": "Aylık kira ÷ aylık ciro × 100",
+            "Aşama": "Tahmini ihale kirası / ciro oranı",
+            "Formül": "Tahmini ihale sonucu kira ÷ aylık ciro × 100",
             "Hesap": (
-                f"{float(girdi.get('aylik_kira', 0)):.2f} ÷ "
+                f"{float(rapor.get('tahmini_ihale_sonucu_kira', 0)):.2f} ÷ "
                 f"{float(rapor.get('tahmini_ciro', 0)):.2f} × 100"
             ),
             "Sonuç": float(rapor.get("kira_orani", 0)),
@@ -747,6 +835,16 @@ def analiz_matematigi_olustur(rapor: Mapping[str, object]) -> list[dict[str, obj
             "Hesap": str(teklif.get("secilen_tavan", 0)),
             "Sonuç": float(teklif.get("secilen_tavan", 0)),
         },
+        {
+            "Aşama": "Azami kira sonrası net kâr",
+            "Formül": "Aylık ciro − kira hariç gider − önerilen azami kira",
+            "Hesap": (
+                f"{float(ciro.get('tahmini_aylik_ciro', 0)):.2f} − "
+                f"{float(gider.get('kira_haric_gider', 0)):.2f} − "
+                f"{float(teklif.get('secilen_tavan', 0)):.2f}"
+            ),
+            "Sonuç": float(teklif.get("azami_kira_sonrasi_net_kar", 0)),
+        },
     ])
     return adimlar
 
@@ -771,10 +869,16 @@ def analizi_kaydet(aday_id: int, rapor: Mapping[str, object]) -> None:
                 personel_hesaplama_modu, manuel_calisan_sayisi,
                 tahmini_net_kar, kira_ciro_orani,
                 risk_skoru, risk_seviyesi, yatirim_skoru,
-                maksimum_teklif, yorum, olusturma_tarihi, guncelleme_tarihi
+                maksimum_teklif,
+                tahmini_ihale_sonucu_kira, tahmini_ihale_azami_orani,
+                tahmini_ihale_sonrasi_net_kar,
+                tahmini_ihale_sonrasi_net_kar_marji,
+                azami_kira_sonrasi_net_kar,
+                azami_kira_sonrasi_net_kar_marji,
+                yorum, olusturma_tarihi, guncelleme_tarihi
             ) VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             ON CONFLICT(aday_id) DO UPDATE SET
                 motor_surumu=excluded.motor_surumu,
@@ -804,6 +908,15 @@ def analizi_kaydet(aday_id: int, rapor: Mapping[str, object]) -> None:
                 risk_seviyesi=excluded.risk_seviyesi,
                 yatirim_skoru=excluded.yatirim_skoru,
                 maksimum_teklif=excluded.maksimum_teklif,
+                tahmini_ihale_sonucu_kira=excluded.tahmini_ihale_sonucu_kira,
+                tahmini_ihale_azami_orani=excluded.tahmini_ihale_azami_orani,
+                tahmini_ihale_sonrasi_net_kar=
+                    excluded.tahmini_ihale_sonrasi_net_kar,
+                tahmini_ihale_sonrasi_net_kar_marji=
+                    excluded.tahmini_ihale_sonrasi_net_kar_marji,
+                azami_kira_sonrasi_net_kar=excluded.azami_kira_sonrasi_net_kar,
+                azami_kira_sonrasi_net_kar_marji=
+                    excluded.azami_kira_sonrasi_net_kar_marji,
                 yorum=excluded.yorum,
                 guncelleme_tarihi=excluded.guncelleme_tarihi
         """, (
@@ -830,7 +943,14 @@ def analizi_kaydet(aday_id: int, rapor: Mapping[str, object]) -> None:
             float(rapor["net_kar"]),
             float(rapor["kira_orani"]), float(rapor["risk_skoru"]),
             str(rapor["risk"]), int(rapor["yatirim_skoru"]),
-            float(rapor["maksimum_kira"]), str(rapor["yorum"]), simdi, simdi,
+            float(rapor["maksimum_kira"]),
+            float(rapor["tahmini_ihale_sonucu_kira"]),
+            float(rapor["tahmini_ihale_azami_orani"]),
+            float(rapor["tahmini_ihale_sonrasi_net_kar"]),
+            float(rapor["tahmini_ihale_sonrasi_net_kar_marji"]),
+            float(rapor["azami_kira_sonrasi_net_kar"]),
+            float(rapor["azami_kira_sonrasi_net_kar_marji"]),
+            str(rapor["yorum"]), simdi, simdi,
         ))
 
 
@@ -866,6 +986,7 @@ def _etkin_analiz_girdisi_getir(aday_id: int) -> tuple[dict[str, object], dict[s
                    m.ortalama_ogrenci_harcamasi,
                    m.yillik_egitim_gunu,
                    m.hedef_net_kar_orani,
+                   m.tahmini_ihale_azami_orani,
                    m.otomatik_personel_hesapla,
                    m.manuel_calisan_sayisi,
                    m.asgari_ucret,
@@ -893,6 +1014,7 @@ def _etkin_analiz_girdisi_getir(aday_id: int) -> tuple[dict[str, object], dict[s
             "ogrenci_donusum_orani", "ortalama_ogrenci_harcamasi",
             "yillik_egitim_gunu",
             "hedef_net_kar_orani",
+            "tahmini_ihale_azami_orani",
             "otomatik_personel_hesapla", "manuel_calisan_sayisi",
             "asgari_ucret", "brut_maas", "sgk_isveren_orani",
             "net_asgari_ucret", "aylik_calisma_saati",
@@ -903,6 +1025,12 @@ def _etkin_analiz_girdisi_getir(aday_id: int) -> tuple[dict[str, object], dict[s
         if veri.get(anahtar) is not None
     }
     return veri, parametreler
+
+
+def aday_analiz_raporu_olustur(aday_id: int) -> dict[str, object]:
+    """Belge ve manuel katmandaki etkin girdilerle tek bir ilan raporu üretir."""
+    girdi, parametreler = _etkin_analiz_girdisi_getir(aday_id)
+    return analiz_raporu_olustur(girdi, parametreler)
 
 
 def manuel_duzeltme_kaydet(
@@ -967,6 +1095,13 @@ def manuel_duzeltme_kaydet(
             "hedef_net_kar_orani", VARSAYILAN_PARAMETRELER["hedef_net_kar_orani"]
         ),
         "Hedef net kâr oranı",
+    )
+    tahmini_ihale_azami_orani = _oran(
+        duzeltme.get(
+            "tahmini_ihale_azami_orani",
+            VARSAYILAN_PARAMETRELER["tahmini_ihale_azami_orani"],
+        ),
+        "Tahmini ihale sonucu / azami kira oranı",
     )
     otomatik_personel = bool(duzeltme.get("otomatik_personel_hesapla", True))
     manuel_calisan = None
@@ -1037,6 +1172,7 @@ def manuel_duzeltme_kaydet(
         "ortalama_ogrenci_harcamasi": harcama,
         "yillik_egitim_gunu": yillik_egitim_gunu,
         "hedef_net_kar_orani": hedef_net_kar_orani,
+        "tahmini_ihale_azami_orani": tahmini_ihale_azami_orani,
         "otomatik_personel_hesapla": otomatik_personel,
         "manuel_calisan_sayisi": manuel_calisan,
         "asgari_ucret": asgari_ucret,
@@ -1064,6 +1200,7 @@ def manuel_duzeltme_kaydet(
                 muhammen_bedel_aylik, muhammen_bedel_yillik,
                 ogrenci_donusum_orani, ortalama_ogrenci_harcamasi,
                 yillik_egitim_gunu, hedef_net_kar_orani,
+                tahmini_ihale_azami_orani,
                 otomatik_personel_hesapla, manuel_calisan_sayisi,
                 asgari_ucret, brut_maas, sgk_isveren_orani,
                 net_asgari_ucret, aylik_calisma_saati,
@@ -1073,7 +1210,7 @@ def manuel_duzeltme_kaydet(
                 duzeltme_notu, duzelten, olusturma_tarihi, guncelleme_tarihi
             ) VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             ON CONFLICT(aday_id) DO UPDATE SET
                 il=excluded.il, ilce=excluded.ilce,
@@ -1086,6 +1223,7 @@ def manuel_duzeltme_kaydet(
                 ortalama_ogrenci_harcamasi=excluded.ortalama_ogrenci_harcamasi,
                 yillik_egitim_gunu=excluded.yillik_egitim_gunu,
                 hedef_net_kar_orani=excluded.hedef_net_kar_orani,
+                tahmini_ihale_azami_orani=excluded.tahmini_ihale_azami_orani,
                 otomatik_personel_hesapla=excluded.otomatik_personel_hesapla,
                 manuel_calisan_sayisi=excluded.manuel_calisan_sayisi,
                 asgari_ucret=excluded.asgari_ucret,
@@ -1108,6 +1246,7 @@ def manuel_duzeltme_kaydet(
             yeni["muhammen_bedel_aylik"], yeni["muhammen_bedel_yillik"],
             yeni["ogrenci_donusum_orani"], yeni["ortalama_ogrenci_harcamasi"],
             yeni["yillik_egitim_gunu"], yeni["hedef_net_kar_orani"],
+            yeni["tahmini_ihale_azami_orani"],
             int(yeni["otomatik_personel_hesapla"]),
             yeni["manuel_calisan_sayisi"], yeni["asgari_ucret"],
             yeni["brut_maas"], yeni["sgk_isveren_orani"],
@@ -1209,7 +1348,9 @@ def tamamlanan_belgeleri_analiz_et(limit: int = 25) -> dict[str, int]:
     tablo_olustur()
     with closing(baglan()) as conn:
         satirlar = conn.execute("""
-            SELECT d.id AS aday_id, d.baslik, k.il, k.ilce,
+            SELECT d.id AS aday_id, d.baslik,
+                   COALESCE(NULLIF(TRIM(m.il), ''), k.il) AS il,
+                   COALESCE(NULLIF(TRIM(m.ilce), ''), k.ilce) AS ilce,
                    COALESCE(NULLIF(TRIM(m.okul_adi), ''), a.okul_adi) AS okul_adi,
                    COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu) AS okul_turu,
                    COALESCE(m.ogrenci_sayisi, a.ogrenci_sayisi) AS ogrenci_sayisi,
@@ -1220,6 +1361,7 @@ def tamamlanan_belgeleri_analiz_et(limit: int = 25) -> dict[str, int]:
                        AS muhammen_bedel_yillik,
                    m.ogrenci_donusum_orani, m.ortalama_ogrenci_harcamasi,
                    m.yillik_egitim_gunu, m.hedef_net_kar_orani,
+                   m.tahmini_ihale_azami_orani,
                    m.otomatik_personel_hesapla, m.manuel_calisan_sayisi,
                    m.asgari_ucret, m.brut_maas, m.sgk_isveren_orani,
                    m.net_asgari_ucret, m.aylik_calisma_saati,
@@ -1260,6 +1402,7 @@ def tamamlanan_belgeleri_analiz_et(limit: int = 25) -> dict[str, int]:
                 for anahtar in (
                     "ogrenci_donusum_orani", "ortalama_ogrenci_harcamasi",
                     "yillik_egitim_gunu", "hedef_net_kar_orani",
+                    "tahmini_ihale_azami_orani",
                     "otomatik_personel_hesapla", "manuel_calisan_sayisi",
                     "asgari_ucret", "brut_maas", "sgk_isveren_orani",
                     "net_asgari_ucret", "aylik_calisma_saati",
@@ -1282,6 +1425,7 @@ __all__ = [
     "ciro_hesapla", "gider_hesapla", "net_kar_hesapla",
     "kira_orani_hesapla", "risk_skoru_hesapla", "yatirim_skoru_hesapla",
     "maksimum_teklif_hesapla", "analiz_raporu_olustur", "analiz_matematigi_olustur",
+    "aday_analiz_raporu_olustur",
     "analizi_kaydet", "kayitli_analizi_getir", "okul_tipi_belirle",
     "tamamlanan_belgeleri_analiz_et", "manuel_duzeltme_kaydet",
     "manuel_duzeltmeyi_kaldir", "OKUL_TURU_HARCAMA_KATSAYILARI",

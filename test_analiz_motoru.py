@@ -124,6 +124,45 @@ class AnalizMotoruTesti(unittest.TestCase):
             analiz_motoru.maksimum_teklif_hesapla(700000, 396000),
         )
 
+    def test_yatirim_skoru_tahmini_ihale_sonucu_kirasini_kullanir(self):
+        rapor = analiz_motoru.analiz_raporu_olustur({
+            "okul_adi": "Atatürk Ortaokulu", "okul_turu": "Ortaokul",
+            "ogrenci_sayisi": 700, "personel_sayisi": 40,
+            "muhammen_bedel_aylik": 30000,
+            "il": "Ankara", "ilce": "Mamak",
+        })
+        beklenen_kira = round(max(30000, rapor["maksimum_kira"] * 0.80), 2)
+        self.assertEqual(beklenen_kira, rapor["tahmini_ihale_sonucu_kira"])
+        self.assertEqual(beklenen_kira, rapor["gider_detayi"]["kira_gideri"])
+        self.assertEqual(
+            round(
+                rapor["tahmini_aylik_ciro"]
+                - rapor["gider_detayi"]["toplam_gider"],
+                2,
+            ),
+            rapor["net_kar"],
+        )
+        self.assertEqual(
+            analiz_motoru.kira_orani_hesapla(
+                beklenen_kira, rapor["tahmini_aylik_ciro"]
+            ),
+            rapor["kira_orani"],
+        )
+        self.assertEqual(
+            rapor["net_kar"], rapor["tahmini_ihale_sonrasi_net_kar"]
+        )
+
+    def test_tahmini_ihale_sonucu_muhammen_bedelden_dusuk_olamaz(self):
+        rapor = analiz_motoru.analiz_raporu_olustur({
+            "okul_adi": "Atatürk İlkokulu", "okul_turu": "İlkokul",
+            "ogrenci_sayisi": 300, "muhammen_bedel_aylik": 500000,
+            "il": "Ankara", "ilce": "Mamak",
+        })
+        self.assertEqual(500000, rapor["tahmini_ihale_sonucu_kira"])
+        self.assertTrue(
+            rapor["ihale_sonucu_detayi"]["muhammen_alt_siniri_uygulandi"]
+        )
+
     def test_okul_turu_ogrenci_harcama_katsayisi_personeli_etkilemez(self):
         ilkokul = analiz_motoru.ciro_hesapla(
             100, 10, okul_tipi="İlkokul", ogrenci_donusum_orani=1,
@@ -178,10 +217,12 @@ class AnalizMotoruTesti(unittest.TestCase):
                 "muhammen_bedel_aylik": 12000,
                 "ogrenci_donusum_orani": 0.60,
                 "ortalama_ogrenci_harcamasi": 55,
+                "tahmini_ihale_azami_orani": 0.70,
                 "duzeltme_notu": "Belge tekrar kontrol edildi",
             })
             self.assertEqual(650, rapor["girdiler"]["ogrenci_sayisi"])
             self.assertEqual("Çankaya", rapor["girdiler"]["ilce"])
+            self.assertEqual(0.70, rapor["tahmini_ihale_azami_orani"])
             self.assertGreater(len(analiz_motoru.analiz_matematigi_olustur(rapor)), 15)
             with closing(veritabani.baglan()) as conn:
                 belge_ogrenci = conn.execute(

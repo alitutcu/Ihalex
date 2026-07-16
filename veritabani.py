@@ -360,6 +360,12 @@ def tablo_olustur() -> None:
                 risk_seviyesi TEXT NOT NULL,
                 yatirim_skoru INTEGER NOT NULL,
                 maksimum_teklif NUMERIC NOT NULL,
+                tahmini_ihale_sonucu_kira NUMERIC NOT NULL DEFAULT 0,
+                tahmini_ihale_azami_orani REAL NOT NULL DEFAULT 0.80,
+                tahmini_ihale_sonrasi_net_kar NUMERIC NOT NULL DEFAULT 0,
+                tahmini_ihale_sonrasi_net_kar_marji REAL NOT NULL DEFAULT 0,
+                azami_kira_sonrasi_net_kar NUMERIC NOT NULL DEFAULT 0,
+                azami_kira_sonrasi_net_kar_marji REAL NOT NULL DEFAULT 0,
                 yorum TEXT NOT NULL,
                 olusturma_tarihi TEXT NOT NULL,
                 guncelleme_tarihi TEXT NOT NULL,
@@ -389,6 +395,12 @@ def tablo_olustur() -> None:
             "toplam_personel_gideri": "NUMERIC",
             "personel_hesaplama_modu": "TEXT",
             "manuel_calisan_sayisi": "INTEGER",
+            "tahmini_ihale_sonucu_kira": "NUMERIC NOT NULL DEFAULT 0",
+            "tahmini_ihale_azami_orani": "REAL NOT NULL DEFAULT 0.80",
+            "tahmini_ihale_sonrasi_net_kar": "NUMERIC NOT NULL DEFAULT 0",
+            "tahmini_ihale_sonrasi_net_kar_marji": "REAL NOT NULL DEFAULT 0",
+            "azami_kira_sonrasi_net_kar": "NUMERIC NOT NULL DEFAULT 0",
+            "azami_kira_sonrasi_net_kar_marji": "REAL NOT NULL DEFAULT 0",
         }.items():
             if kolon not in yatirim_kolonlari:
                 conn.execute(
@@ -413,6 +425,7 @@ def tablo_olustur() -> None:
                 ortalama_ogrenci_harcamasi NUMERIC,
                 yillik_egitim_gunu INTEGER,
                 hedef_net_kar_orani REAL,
+                tahmini_ihale_azami_orani REAL,
                 otomatik_personel_hesapla INTEGER,
                 manuel_calisan_sayisi INTEGER,
                 asgari_ucret NUMERIC,
@@ -451,6 +464,7 @@ def tablo_olustur() -> None:
         for kolon, tanim in {
             "il": "TEXT",
             "ilce": "TEXT",
+            "tahmini_ihale_azami_orani": "REAL",
             "otomatik_personel_hesapla": "INTEGER",
             "manuel_calisan_sayisi": "INTEGER",
             "asgari_ucret": "NUMERIC",

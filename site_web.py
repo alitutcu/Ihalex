@@ -31,9 +31,9 @@ from analiz_motoru import (
     OKUL_TURU_DONUSUM_ARALIKLARI,
     OKUL_TURU_DONUSUM_ORANLARI,
     OKUL_TURU_HARCAMA_KATSAYILARI,
+    aday_analiz_raporu_olustur,
     analiz_matematigi_olustur,
     analizi_kaydet,
-    analiz_raporu_olustur,
     manuel_duzeltme_kaydet,
     manuel_duzeltmeyi_kaldir,
     okul_tipi_belirle,
@@ -85,7 +85,7 @@ SAYFA_ADLARI = {deger: anahtar for anahtar, deger in SAYFALAR.items()}
 BANNER_GORSELI = Path(__file__).resolve().parent / "assets" / "banner-school-cafeteria-source.jpg"
 ADMIN_OTURUM_SURESI = timedelta(hours=3)
 ADMIN_CEREZ_ADI = "ihalex_admin_oturum"
-VERITABANI_SEMA_SURUMU = "2026-07-16-manuel-konum-v2"
+VERITABANI_SEMA_SURUMU = "2026-07-16-ihale-sonuc-modeli-v4"
 
 
 @st.cache_data(show_spinner=False)
@@ -1767,7 +1767,7 @@ def yapay_zeka_analiz_sayfasi(df: pd.DataFrame) -> None:
                 ):
                     kolon.metric(etiket, deger)
                 ucret_metrikleri = [
-                    ("Aylık muhammen bedel", _para_bicimlendir(satir["muhammen_bedel_aylik"])),
+                    ("Muhammen başlangıç bedeli", _para_bicimlendir(satir["muhammen_bedel_aylik"])),
                     ("Yıllık muhammen bedel", _para_bicimlendir(satir["muhammen_bedel_yillik"])),
                 ]
                 for alan, etiket in (
@@ -1848,7 +1848,7 @@ def yapay_zeka_analiz_sayfasi(df: pd.DataFrame) -> None:
                     key=f"ai_analiz_dugmesi_{ilan_id}",
                 ):
                     try:
-                        yatirim_raporu = analiz_raporu_olustur(satir)
+                        yatirim_raporu = aday_analiz_raporu_olustur(ilan_id)
                         analizi_kaydet(ilan_id, yatirim_raporu)
                     except AnalizVerisiHatasi as hata:
                         st.session_state[hata_anahtari] = str(hata)
@@ -1888,10 +1888,71 @@ def yapay_zeka_analiz_sayfasi(df: pd.DataFrame) -> None:
                         "tahmini_yillik_ciro",
                         float(gunluk_ciro or 0) * yillik_egitim_gunu,
                     )
+                    gider_detayi = yatirim_raporu.get("gider_detayi", {})
+                    azami_kira_sonrasi_kar = float(
+                        yatirim_raporu.get(
+                            "azami_kira_sonrasi_net_kar",
+                            float(aylik_ciro or 0)
+                            - float(gider_detayi.get("kira_haric_gider", 0))
+                            - float(yatirim_raporu.get("maksimum_kira", 0)),
+                        )
+                    )
+                    azami_kira_sonrasi_marj = float(
+                        yatirim_raporu.get(
+                            "azami_kira_sonrasi_net_kar_marji",
+                            azami_kira_sonrasi_kar / float(aylik_ciro or 1) * 100,
+                        )
+                    )
+                    tahmini_ihale_orani = float(
+                        yatirim_raporu.get(
+                            "tahmini_ihale_azami_orani",
+                            yatirim_raporu.get("varsayimlar", {}).get(
+                                "tahmini_ihale_azami_orani", 0.80
+                            ),
+                        )
+                    )
+                    tahmini_ihale_kirasi = float(
+                        yatirim_raporu.get(
+                            "tahmini_ihale_sonucu_kira",
+                            max(
+                                float(satir.get("muhammen_bedel_aylik") or 0),
+                                float(yatirim_raporu.get("maksimum_kira", 0))
+                                * tahmini_ihale_orani,
+                            ),
+                        )
+                    )
+                    tahmini_ihale_net_kar = float(
+                        yatirim_raporu.get(
+                            "tahmini_ihale_sonrasi_net_kar",
+                            yatirim_raporu.get("net_kar", 0),
+                        )
+                    )
+                    tahmini_ihale_net_marj = float(
+                        yatirim_raporu.get(
+                            "tahmini_ihale_sonrasi_net_kar_marji",
+                            tahmini_ihale_net_kar / float(aylik_ciro or 1) * 100,
+                        )
+                    )
                     y1, y2, y3 = st.columns(3)
                     y1.metric("Yatırım skoru", f"{int(yatirim_raporu['yatirim_skoru'])}/100")
                     y2.metric("Risk", str(yatirim_raporu["risk"]))
-                    y3.metric("Kira / ciro", f"%{float(yatirim_raporu['kira_orani']):.1f}")
+                    y3.metric(
+                        "Tahmini ihale kirası / ciro",
+                        f"%{float(yatirim_raporu['kira_orani']):.1f}",
+                    )
+                    skor_bilesenleri = yatirim_raporu.get(
+                        "yatirim_skoru_detayi", {}
+                    ).get("bilesenler", {})
+                    if skor_bilesenleri:
+                        st.caption(
+                            "Skor hesabı · "
+                            f"{float(skor_bilesenleri.get('taban_puan', 0)):+.0f} taban · "
+                            f"{float(skor_bilesenleri.get('kar_marji_puani', 0)):+.0f} kâr · "
+                            f"{float(skor_bilesenleri.get('kira_ciro_puani', 0)):+.0f} kira/ciro · "
+                            f"{float(skor_bilesenleri.get('ogrenci_puani', 0)):+.0f} öğrenci · "
+                            f"{float(skor_bilesenleri.get('bolge_puani', 0)):+.1f} bölge · "
+                            f"{float(skor_bilesenleri.get('risk_kesintisi', 0)):+.1f} risk"
+                        )
                     z1, z2 = st.columns(2)
                     z1.metric(
                         "Tahmini aylık ciro",
@@ -1902,8 +1963,35 @@ def yapay_zeka_analiz_sayfasi(df: pd.DataFrame) -> None:
                         _para_bicimlendir(yillik_ciro),
                     )
                     z3, z4 = st.columns(2)
-                    z3.metric("Tahmini net kâr", _para_bicimlendir(yatirim_raporu["net_kar"]))
-                    z4.metric("Önerilen azami kira", _para_bicimlendir(yatirim_raporu["maksimum_kira"]))
+                    z3.metric(
+                        "Tahmini ihale sonucu kira",
+                        _para_bicimlendir(tahmini_ihale_kirasi),
+                        delta=f"Azami kiranın %{tahmini_ihale_orani * 100:.0f}'i",
+                        delta_color="off",
+                    )
+                    z4.metric(
+                        "Tahmini ihale sonrası net kâr",
+                        _para_bicimlendir(tahmini_ihale_net_kar),
+                        delta=f"%{tahmini_ihale_net_marj:.1f} net kâr marjı",
+                        delta_color="off",
+                    )
+                    z5, z6 = st.columns(2)
+                    z5.metric(
+                        "Önerilen azami kira",
+                        _para_bicimlendir(yatirim_raporu["maksimum_kira"]),
+                    )
+                    z6.metric(
+                        "Azami kira sonrası net kâr",
+                        _para_bicimlendir(azami_kira_sonrasi_kar),
+                        delta=f"%{azami_kira_sonrasi_marj:.1f} net kâr marjı",
+                        delta_color="off",
+                    )
+                    st.caption(
+                        "Yatırım skoru; muhammen başlangıç bedeli yerine, önerilen "
+                        f"azami kiranın %{tahmini_ihale_orani * 100:.0f}'i olarak "
+                        "modellenen ihale sonucu kira üzerinden hesaplanır. Tahmin, "
+                        "muhammen başlangıç bedelinden düşük olamaz."
+                    )
                     st.caption(
                         "Yıllık ciro; hafta sonu, ara tatil, sömestr, yaz tatili ve "
                         "resmî tatiller hariç "
@@ -2369,6 +2457,8 @@ def ai_yonetim_verileri_getir() -> pd.DataFrame:
                        COALESCE(m.yillik_egitim_gunu, 180) AS yillik_egitim_gunu,
                        COALESCE(m.hedef_net_kar_orani, 0.25) * 100
                            AS hedef_net_kar_yuzde,
+                       COALESCE(m.tahmini_ihale_azami_orani, 0.80) * 100
+                           AS tahmini_ihale_azami_yuzde,
                        COALESCE(m.otomatik_personel_hesapla, 1)
                            AS otomatik_personel_hesapla,
                        m.manuel_calisan_sayisi,
@@ -2396,6 +2486,11 @@ def ai_yonetim_verileri_getir() -> pd.DataFrame:
                        y.tahmini_net_kar,
                        y.kira_ciro_orani, y.risk_skoru, y.risk_seviyesi,
                        y.yatirim_skoru, y.maksimum_teklif,
+                       y.tahmini_ihale_sonucu_kira,
+                       y.tahmini_ihale_sonrasi_net_kar,
+                       y.tahmini_ihale_sonrasi_net_kar_marji,
+                       y.azami_kira_sonrasi_net_kar,
+                       y.azami_kira_sonrasi_net_kar_marji,
                        y.baz_personel_sayisi, y.onerilen_calisan_sayisi,
                        CASE WHEN y.personel_hesaplama_modu='manuel'
                             THEN y.manuel_calisan_sayisi
@@ -2587,7 +2682,8 @@ def ai_analiz_yonetimi_goster() -> None:
         "ogrenci_kontrol", "ogrenci_sayisi", "personel_sayisi",
         "muhammen_kontrol", "muhammen_bedel_aylik", "muhammen_bedel_yillik",
         "ogrenci_donusum_orani", "gunluk_ogrenci_harcamasi",
-        "yillik_egitim_gunu", "hedef_net_kar_yuzde", "duzeltme_notu",
+        "yillik_egitim_gunu", "hedef_net_kar_yuzde",
+        "tahmini_ihale_azami_yuzde", "duzeltme_notu",
         "otomatik_personel_hesapla", "manuel_calisan_sayisi",
         "asgari_ucret", "net_asgari_ucret", "brut_maas",
         "aylik_calisma_saati", "tam_zamanli_aylik_saat",
@@ -2601,6 +2697,9 @@ def ai_analiz_yonetimi_goster() -> None:
         "personel_hesaplama_modu",
         "tahmini_net_kar", "kira_ciro_orani",
         "risk_skoru", "risk_seviyesi", "yatirim_skoru", "maksimum_teklif",
+        "tahmini_ihale_sonucu_kira", "tahmini_ihale_sonrasi_net_kar",
+        "tahmini_ihale_sonrasi_net_kar_marji",
+        "azami_kira_sonrasi_net_kar", "azami_kira_sonrasi_net_kar_marji",
     ]
     st.markdown('<div id="ai-mudahale-tablosu"></div>', unsafe_allow_html=True)
     duzenlenen = st.data_editor(
@@ -2620,6 +2719,9 @@ def ai_analiz_yonetimi_goster() -> None:
             "personel_hesaplama_modu",
             "kira_ciro_orani", "risk_skoru", "risk_seviyesi",
             "yatirim_skoru", "maksimum_teklif",
+            "tahmini_ihale_sonucu_kira", "tahmini_ihale_sonrasi_net_kar",
+            "tahmini_ihale_sonrasi_net_kar_marji",
+            "azami_kira_sonrasi_net_kar", "azami_kira_sonrasi_net_kar_marji",
         ],
         column_config={
             "aday_id": st.column_config.NumberColumn("Kayıt", format="%d"),
@@ -2683,6 +2785,11 @@ def ai_analiz_yonetimi_goster() -> None:
                 "Hedef net kâr %", min_value=0.0, max_value=100.0,
                 step=1.0, format="%.1f", required=True,
             ),
+            "tahmini_ihale_azami_yuzde": st.column_config.NumberColumn(
+                "Tahmini ihale / azami kira %", min_value=0.0,
+                max_value=100.0, step=1.0, format="%.1f", required=True,
+                help="Yatırım skoru için ihale sonucunun önerilen azami kiraya yaklaşma varsayımı.",
+            ),
             "otomatik_personel_hesapla": st.column_config.CheckboxColumn(
                 "Otomatik personel", default=True,
             ),
@@ -2737,6 +2844,21 @@ def ai_analiz_yonetimi_goster() -> None:
             "risk_skoru": st.column_config.NumberColumn("Risk puanı", format="%.2f"),
             "risk_seviyesi": "Risk", "yatirim_skoru": "Yatırım skoru",
             "maksimum_teklif": st.column_config.NumberColumn("Azami teklif", format="%.2f TL"),
+            "tahmini_ihale_sonucu_kira": st.column_config.NumberColumn(
+                "Tahmini ihale sonucu kira", format="%.2f TL"
+            ),
+            "tahmini_ihale_sonrasi_net_kar": st.column_config.NumberColumn(
+                "İhale sonucu net kâr", format="%.2f TL"
+            ),
+            "tahmini_ihale_sonrasi_net_kar_marji": st.column_config.NumberColumn(
+                "İhale sonucu net kâr %", format="%.2f"
+            ),
+            "azami_kira_sonrasi_net_kar": st.column_config.NumberColumn(
+                "Azami kira sonrası net kâr", format="%.2f TL"
+            ),
+            "azami_kira_sonrasi_net_kar_marji": st.column_config.NumberColumn(
+                "Azami kira sonrası net kâr %", format="%.2f"
+            ),
         },
         key="ai_hesaplama_editoru",
     )
@@ -2750,7 +2872,8 @@ def ai_analiz_yonetimi_goster() -> None:
             "ogrenci_sayisi", "personel_sayisi",
             "muhammen_bedel_aylik", "ogrenci_donusum_orani",
             "gunluk_ogrenci_harcamasi", "yillik_egitim_gunu",
-            "hedef_net_kar_yuzde", "duzeltme_notu",
+            "hedef_net_kar_yuzde", "tahmini_ihale_azami_yuzde",
+            "duzeltme_notu",
             "otomatik_personel_hesapla", "manuel_calisan_sayisi",
             "asgari_ucret", "net_asgari_ucret", "brut_maas",
             "aylik_calisma_saati", "tam_zamanli_aylik_saat",
@@ -2778,6 +2901,9 @@ def ai_analiz_yonetimi_goster() -> None:
                 )
                 payload["hedef_net_kar_orani"] = (
                     float(payload.pop("hedef_net_kar_yuzde")) / 100
+                )
+                payload["tahmini_ihale_azami_orani"] = (
+                    float(payload.pop("tahmini_ihale_azami_yuzde")) / 100
                 )
                 payload["sgk_isveren_orani"] = (
                     float(payload.pop("sgk_isveren_yuzde")) / 100
