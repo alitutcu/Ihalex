@@ -263,10 +263,10 @@ def stilleri_yukle(gomulu: bool) -> None:
         .ihalex-radar-brand .i-letter::after {{
             content: "";
             position: absolute;
-            width: .14em;
+            width: .28em;
             aspect-ratio: 1;
             left: 50%;
-            top: -.18em;
+            top: -.25em;
             transform: translateX(-50%);
             border-radius: 50%;
             background: var(--ihalex-red);
