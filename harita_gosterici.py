@@ -233,11 +233,24 @@ def turkiye_il_haritasi(df: pd.DataFrame) -> go.Figure:
         il = str(feature["properties"]["ADI"])
         ozet = ozetler.get(il, {})
         toplam = int(ozet.get("ilan_sayisi", 0))
-        seviye = 0 if toplam == 0 else 1 if toplam == 1 else 2 if toplam <= 5 else 3 if toplam <= 10 else 4
+        aktif = int(ozet.get("aktif_sayisi", 0))
+        seviye = (
+            5
+            if aktif > 0
+            else 0
+            if toplam == 0
+            else 1
+            if toplam == 1
+            else 2
+            if toplam <= 5
+            else 3
+            if toplam <= 10
+            else 4
+        )
         satirlar.append({
             "il": il,
             "ilan_sayisi": toplam,
-            "aktif_sayisi": int(ozet.get("aktif_sayisi", 0)),
+            "aktif_sayisi": aktif,
             "pasif_sayisi": int(ozet.get("pasif_sayisi", 0)),
             "inceleme_sayisi": int(ozet.get("inceleme_sayisi", 0)),
             "seviye": seviye,
@@ -253,13 +266,14 @@ def turkiye_il_haritasi(df: pd.DataFrame) -> go.Figure:
         z=harita_df["seviye"],
         featureidkey="properties.harita_id",
         zmin=0,
-        zmax=4,
+        zmax=5,
         colorscale=[
             [0.00, "#D9D9D9"], [0.19, "#D9D9D9"],
             [0.20, "#FFF2B5"], [0.39, "#FFF2B5"],
             [0.40, "#FFE990"], [0.59, "#FFE990"],
             [0.60, "#FFE063"], [0.79, "#FFE063"],
-            [0.80, "#FFD21F"], [1.00, "#FFD21F"],
+            [0.80, "#FFD21F"], [0.99, "#FFD21F"],
+            [1.00, "#22C55E"],
         ],
         marker_line_color="#FFFFFF",
         marker_line_width=1.05,

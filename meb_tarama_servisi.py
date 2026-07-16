@@ -271,10 +271,27 @@ def _resmi_meb_url(url: str) -> bool:
     return host == "meb.gov.tr" or host.endswith(".meb.gov.tr")
 
 
+def _yeni_ana_ilan_mi(eklenen_satir: int, eslesme_turu: str) -> bool:
+    """Ek dosyalari yeni ihale sayacindan ve alarmindan ayirir."""
+    return eklenen_satir == 1 and eslesme_turu != "ek_dosya"
+
+
 def _ihale_eslesmesi(metin: str) -> bool:
     temiz = metin.casefold()
     return (any(k.casefold() in temiz for k in KANTIN_TERIMLERI)
             and any(k.casefold() in temiz for k in IHALE_TERIMLERI))
+
+
+def _genel_baglanti_metni(metin: object) -> bool:
+    temiz = unicodedata.normalize("NFKD", str(metin or "").casefold()).replace("ı", "i")
+    temiz = "".join(harf for harf in temiz if not unicodedata.combining(harf))
+    temiz = " ".join(re.findall(r"[a-z0-9]+", temiz))
+    return not temiz or any(
+        ifade in temiz for ifade in (
+            "tiklayiniz", "tiklayin", "dosya icin", "duyuru icin",
+            "ihale sartnamesi icin", "buradan ulasabilirsiniz",
+        )
+    )
 
 
 def _html_getir(oturum: requests.Session, url: str) -> BeautifulSoup:
@@ -379,7 +396,9 @@ def _detay_dogrula(
             ek_url = urljoin(url, baglanti.get("href", "").strip())
             ek_uzanti = PurePosixPath(urlparse(ek_url).path).suffix.lower()
             if _resmi_meb_url(ek_url) and ek_uzanti in DOSYA_UZANTILARI:
-                ek_baslik = " ".join(baglanti.get_text(" ", strip=True).split()) or baslik
+                ek_baslik = " ".join(baglanti.get_text(" ", strip=True).split())
+                if _genel_baglanti_metni(ek_baslik):
+                    ek_baslik = baslik
                 ekler.append((ek_url, ek_baslik))
         if not ihale_tarihi:
             for ek_url, _ in ekler:
@@ -547,8 +566,10 @@ def kaynak_tara(kaynak: dict[str, object]) -> tuple[int, int]:
                       eslesme_turu, yayin_tarihi, ihale_tarihi,
                       uzanti if uzanti in DOSYA_UZANTILARI else "html",
                       simdi, simdi))
-                yeni += cursor.rowcount
-                if cursor.rowcount == 1 and not ilk_tarama:
+                yeni_ana_ilan = _yeni_ana_ilan_mi(cursor.rowcount, eslesme_turu)
+                if yeni_ana_ilan:
+                    yeni += 1
+                if yeni_ana_ilan and not ilk_tarama:
                     conn.execute("""
                         INSERT OR IGNORE INTO alarmlar(aday_id, kanal, olusturma_tarihi)
                         VALUES (?, 'telegram', ?)

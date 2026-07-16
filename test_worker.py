@@ -53,12 +53,15 @@ class WorkerTesti(unittest.TestCase):
                 patch.object(worker, "siradaki_kaynaklar", return_value=kaynaklar),
                 patch.object(worker, "kaynak_tara", side_effect=[(4, 2), (5, 3)]),
                 patch.object(worker, "telegram_turu", return_value=0),
+                patch.object(worker, "belge_arsiv_turu", return_value=0),
             ):
                 self.assertEqual(5, worker.tarama_turu(paralellik=1))
             sonuc = json.loads(durum.read_text(encoding="utf-8"))
             self.assertEqual("bekliyor", sonuc["durum"])
             self.assertEqual(5, sonuc["son_yeni_kayit"])
             self.assertEqual(2, sonuc["kaynak_sayisi"])
+            self.assertEqual(2, sonuc["tamamlanan_kaynak"])
+            self.assertEqual(0, sonuc["hata_sayisi"])
 
 
 if __name__ == "__main__":

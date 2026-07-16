@@ -32,7 +32,17 @@ class VeritabaniTesti(unittest.TestCase):
         with self.assertRaises(ValueError):
             veritabani.ilan_kaydet({"baslik": "Eksik ilan"})
 
-    def test_eski_ve_tarihsiz_adaylar_temizlenir(self):
+    def test_ihalex_surumu_tarih_ve_etiketiyle_saklanir(self):
+        with closing(veritabani.baglan()) as conn:
+            surum = conn.execute("""
+                SELECT surum_kodu, surum_adi, yayin_tarihi, git_etiketi
+                FROM sistem_surumleri WHERE surum_kodu='v1.1.0'
+            """).fetchone()
+        self.assertEqual("Şeffaf Analiz Çekirdeği", surum["surum_adi"])
+        self.assertEqual("2026-07-16", surum["yayin_tarihi"])
+        self.assertEqual("v1.1.0-seffaf-analiz-cekirdegi", surum["git_etiketi"])
+
+    def test_eski_ve_tarihsiz_adaylar_kalici_arsivde_saklanir(self):
         with closing(veritabani.baglan()) as conn, conn:
             kaynak_id = conn.execute("""
                 INSERT INTO kaynaklar
@@ -46,12 +56,12 @@ class VeritabaniTesti(unittest.TestCase):
                     VALUES (?, 'Kantin ihalesi', ?, ?, '2026-01-01', '2026-01-01')
                 """, (kaynak_id, f"https://mamak.meb.gov.tr/{sira}", tarih))
 
-        self.assertEqual(2, veritabani.eski_adaylari_temizle("2025-07-15"))
+        self.assertEqual(0, veritabani.eski_adaylari_temizle("2025-07-15"))
         with closing(veritabani.baglan()) as conn:
             tarihler = [satir[0] for satir in conn.execute(
                 "SELECT yayin_tarihi FROM duyuru_adaylari"
             )]
-        self.assertEqual(["2025-07-15"], tarihler)
+        self.assertEqual(["2025-07-14", None, "2025-07-15"], tarihler)
 
     def test_ihale_durumu_tarihe_gore_guncellenir(self):
         with closing(veritabani.baglan()) as conn, conn:

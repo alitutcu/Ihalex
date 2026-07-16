@@ -10,6 +10,11 @@ import meb_tarama_servisi
 
 
 class MebTaramaServisiTesti(unittest.TestCase):
+    def test_ek_dosya_yeni_ilan_ve_alarm_sayilmaz(self):
+        self.assertFalse(meb_tarama_servisi._yeni_ana_ilan_mi(1, "ek_dosya"))
+        self.assertTrue(meb_tarama_servisi._yeni_ana_ilan_mi(1, "detay"))
+        self.assertFalse(meb_tarama_servisi._yeni_ana_ilan_mi(0, "detay"))
+
     def test_tarihi_metin_icinden_duzeltir(self):
         self.assertEqual(
             "2026-07-14",

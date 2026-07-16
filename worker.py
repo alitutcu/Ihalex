@@ -15,6 +15,14 @@ from zoneinfo import ZoneInfo
 from meb_kaynaklari import siradaki_kaynaklar, tum_aktif_kaynaklar
 from meb_tarama_servisi import kaynak_tara
 from ihale_tarihi_geri_doldur import geri_doldur
+from ihale_belge_arsivi import (
+    arsivi_geri_doldur,
+    kayitli_metinleri_yeniden_ayristir,
+    toplu_ilan_belgelerini_ayir,
+    yerel_arsivi_yeniden_isle,
+)
+from analiz_motoru import tamamlanan_belgeleri_analiz_et
+from tarama_kontrolu import DURUM_DOSYASI, manuel_tarama_istegini_al
 from veritabani import aday_durumlarini_guncelle, eski_adaylari_temizle, tablo_olustur
 from telegram_alarm import (
     TelegramKurulumHatasi,
@@ -24,7 +32,6 @@ from telegram_alarm import (
 
 KOK = Path(__file__).resolve().parent
 LOG_DOSYASI = KOK / "worker.log"
-DURUM_DOSYASI = KOK / "worker_durumu.json"
 duruyor = False
 TURKIYE_SAATI = ZoneInfo("Europe/Istanbul")
 TARAMA_SAATLERI = ((11, 59), (23, 59))
@@ -70,15 +77,70 @@ def telegram_turu() -> int:
         return 0
 
 
-def tarama_turu(limit: int | None = 20, paralellik: int = 6) -> int:
+def belge_arsiv_turu(limit: int = 2) -> int:
+    try:
+        # Yeni ayrıştırma kuralları önce saklanan metinde denenir; OCR tekrarlanmaz.
+        metin_sonucu = kayitli_metinleri_yeniden_ayristir(
+            limit=max(10, limit * 10)
+        )
+        if metin_sonucu["islenen"] or metin_sonucu["hata"]:
+            logging.info(
+                "Saklanan metin ayrıştırma: %s işlendi, %s tamamlandı, %s eksik, %s hata",
+                metin_sonucu["islenen"], metin_sonucu["tamamlanan"],
+                metin_sonucu["eksik"], metin_sonucu["hata"],
+            )
+        # Yeni ve aktif ilanlar her zaman geçmiş arşiv düzenlemesinden önce gelir.
+        sonuc = arsivi_geri_doldur(limit=limit)
+        if sonuc["islenen"] or sonuc["hata"]:
+            logging.info(
+                "Belge arşivi: %s işlendi, %s analiz edildi, %s hata",
+                sonuc["islenen"], sonuc["analiz_edilen"], sonuc["hata"],
+            )
+        ayrilan = toplu_ilan_belgelerini_ayir(limit=max(2, limit * 2))
+        if ayrilan["ayrilan"] or ayrilan["temizlenen_parent"]:
+            logging.info(
+                "Toplu ilan ayrıştırma: %s belge okul kaydına taşındı, %s ana analiz temizlendi",
+                ayrilan["ayrilan"], ayrilan["temizlenen_parent"],
+            )
+        yeniden = yerel_arsivi_yeniden_isle(limit=limit)
+        if yeniden["islenen"] or yeniden["hata"]:
+            logging.info(
+                "Yerel belge yeniden işleme: %s işlendi, %s hazır, %s hata",
+                yeniden["islenen"], yeniden["analiz_edilen"], yeniden["hata"],
+            )
+        yatirim = tamamlanan_belgeleri_analiz_et(limit=25)
+        if yatirim["islenen"]:
+            logging.info("Yatırım analizi: %s yeni rapor", yatirim["islenen"])
+        return sonuc["islenen"]
+    except Exception:
+        logging.exception("Belge arşiv turu tamamlanamadı")
+        return 0
+
+
+def tarama_turu(
+    limit: int | None = 20,
+    paralellik: int = 6,
+    tetikleyici: str = "planli",
+) -> int:
     baslangic = datetime.now().isoformat(timespec="seconds")
-    durum_yaz(durum="tariyor", son_baslangic=baslangic, hata=None)
     temizlenen = eski_adaylari_temizle()
     aday_durumlarini_guncelle()
     if temizlenen:
         logging.info("Tarih penceresi disindaki %s kayit temizlendi", temizlenen)
     yeni_toplam = 0
     kaynaklar = tum_aktif_kaynaklar() if limit is None else siradaki_kaynaklar(limit)
+    tamamlanan = 0
+    hata_sayisi = 0
+    durum_yaz(
+        durum="tariyor",
+        son_baslangic=baslangic,
+        hata=None,
+        tetikleyici=tetikleyici,
+        kaynak_sayisi=len(kaynaklar),
+        tamamlanan_kaynak=0,
+        anlik_yeni_kayit=0,
+        hata_sayisi=0,
+    )
     logging.info("MEB taraması başladı: %s kaynak", len(kaynaklar))
     with ThreadPoolExecutor(max_workers=paralellik) as havuz:
         isler = {havuz.submit(_tek_kaynak, kaynak): kaynak for kaynak in kaynaklar}
@@ -87,11 +149,28 @@ def tarama_turu(limit: int | None = 20, paralellik: int = 6) -> int:
             try:
                 yeni_toplam += islem.result()
             except Exception:
+                hata_sayisi += 1
                 logging.exception("Kaynak taranamadı: %s", kaynak.get("kurum_adi"))
 
+            tamamlanan += 1
+            durum_yaz(
+                tamamlanan_kaynak=tamamlanan,
+                anlik_yeni_kayit=yeni_toplam,
+                hata_sayisi=hata_sayisi,
+                son_kaynak=str(kaynak.get("kurum_adi") or ""),
+            )
+
     bitis = datetime.now().isoformat(timespec="seconds")
-    durum_yaz(durum="bekliyor", son_bitis=bitis, son_yeni_kayit=yeni_toplam,
-               kaynak_sayisi=len(kaynaklar), hata=None)
+    durum_yaz(
+        durum="sonuclaniyor",
+        son_bitis=bitis,
+        son_yeni_kayit=yeni_toplam,
+        kaynak_sayisi=len(kaynaklar),
+        tamamlanan_kaynak=len(kaynaklar),
+        anlik_yeni_kayit=yeni_toplam,
+        hata_sayisi=hata_sayisi,
+        hata=None,
+    )
     tarih_limiti = max(50, yeni_toplam * 5) if limit is None else 5
     tarih_sonucu = geri_doldur(
         paralellik=min(paralellik, 2),
@@ -112,6 +191,8 @@ def tarama_turu(limit: int | None = 20, paralellik: int = 6) -> int:
             "Geçmiş tarih kuyruğu: %s işlendi, %s tarih bulundu",
             gecmis_sonucu["islenen"], gecmis_sonucu["bulunan"],
         )
+    belge_arsiv_turu(limit=2)
+    durum_yaz(durum="bekliyor", son_bitis=datetime.now().isoformat(timespec="seconds"))
     return yeni_toplam
 
 
@@ -143,16 +224,41 @@ def planli_dongu(paralellik: int) -> None:
             sonraki_tarama=sonraki.isoformat(timespec="minutes"),
             tarama_programi=["11:59", "23:59"],
         )
+        manuel_calisti = False
+        son_telegram_turu = 0.0
+        son_belge_arsiv_turu = 0.0
         while not duruyor:
+            istek = manuel_tarama_istegini_al()
+            if istek is not None:
+                logging.info("Yonetim panelinden manuel tam tarama istendi")
+                try:
+                    tarama_turu(
+                        limit=None,
+                        paralellik=paralellik,
+                        tetikleyici="manuel",
+                    )
+                except Exception as hata:
+                    logging.exception("Manuel tam tarama basarisiz")
+                    durum_yaz(durum="hata", hata=str(hata))
+                manuel_calisti = True
+                break
             kalan = (sonraki - datetime.now(TURKIYE_SAATI)).total_seconds()
             if kalan <= 0:
                 break
-            telegram_turu()
-            _kesilebilir_bekle(min(30, max(1, int(kalan))))
+            simdi = time.monotonic()
+            if simdi - son_telegram_turu >= 30:
+                telegram_turu()
+                son_telegram_turu = simdi
+            if simdi - son_belge_arsiv_turu >= 45:
+                belge_arsiv_turu(limit=2)
+                son_belge_arsiv_turu = time.monotonic()
+            _kesilebilir_bekle(min(2, max(1, int(kalan))))
         if duruyor:
             break
+        if manuel_calisti:
+            continue
         try:
-            tarama_turu(limit=None, paralellik=paralellik)
+            tarama_turu(limit=None, paralellik=paralellik, tetikleyici="planli")
         except Exception as hata:
             logging.exception("Planlı tam tarama başarısız")
             durum_yaz(durum="hata", hata=str(hata))

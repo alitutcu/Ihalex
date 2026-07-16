@@ -74,6 +74,9 @@ class HaritaTesti(unittest.TestCase):
         self.assertEqual(IL_HARITA_YUKSEKLIGI, sekil.layout.height)
         self.assertEqual("event+select", sekil.layout.clickmode)
         self.assertFalse(sekil.data[0].showscale)
+        konya_indeksi = list(sekil.data[0].locations).index("Konya")
+        self.assertEqual(5, sekil.data[0].z[konya_indeksi])
+        self.assertEqual("#22C55E", sekil.data[0].colorscale[-1][1])
 
 
 if __name__ == "__main__":

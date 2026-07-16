@@ -3,9 +3,20 @@ import unittest
 import pandas as pd
 
 from istatistik_motoru import okul_adi_ayikla, tekrar_ihale_ozeti
+from okul_adi_servisi import okul_adi_temizle
 
 
 class IstatistikMotoruTesti(unittest.TestCase):
+    def test_okul_adindaki_ozel_karakterler_temizlenir(self):
+        self.assertEqual(
+            "Talat Tömekçe İlkokulu",
+            okul_adi_temizle("(*Talat Tömekçe İlkokulu?!')"),
+        )
+        self.assertEqual(
+            "75. Yıl Ortaokulu",
+            okul_adi_temizle("75. Yıl Ortaokulu"),
+        )
+
     def test_mem_adi_okul_adindan_ayrilir(self):
         ornekler = {
             "Altınözü İlçe Milli Eğitim Müdürlüğü Atatürk Ortaokulu Kantin İşletme İhale Duyurusu": "Atatürk Ortaokulu",

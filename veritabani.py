@@ -8,6 +8,9 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Mapping
 
+from okul_adi_servisi import okul_adi_temizle
+from surum_bilgisi import SURUM_GECMISI
+
 DB = Path(__file__).resolve().with_name("ilanlar.db")
 IHALE_GECERLILIK_GUNU = 365
 
@@ -24,6 +27,32 @@ def baglan(db_yolu: str | Path | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA busy_timeout = 30000")
     return conn
+
+
+def okul_adlarini_temizle(db_yolu: str | Path | None = None) -> int:
+    """Belge ve manuel düzeltme kayıtlarındaki okul adlarını yerinde normalleştir."""
+    degisen = 0
+    with closing(baglan(db_yolu)) as conn, conn:
+        for tablo in ("ilan_analiz_verileri", "analiz_manuel_duzeltmeleri"):
+            mevcut = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (tablo,),
+            ).fetchone()
+            if not mevcut:
+                continue
+            for satir in conn.execute(
+                f"SELECT aday_id, okul_adi FROM {tablo} "
+                "WHERE NULLIF(TRIM(okul_adi), '') IS NOT NULL"
+            ).fetchall():
+                eski = str(satir["okul_adi"])
+                yeni = okul_adi_temizle(eski)
+                if yeni and yeni != eski:
+                    conn.execute(
+                        f"UPDATE {tablo} SET okul_adi=? WHERE aday_id=?",
+                        (yeni, int(satir["aday_id"])),
+                    )
+                    degisen += 1
+    return degisen
 
 
 def tablo_olustur() -> None:
@@ -124,6 +153,20 @@ def tablo_olustur() -> None:
             if kolon not in aday_kolonlari:
                 conn.execute(f"ALTER TABLE duyuru_adaylari ADD COLUMN {kolon} {tanim}")
         conn.execute("""
+            UPDATE duyuru_adaylari AS ek
+            SET baslik=COALESCE((
+                SELECT NULLIF(TRIM(parent.baslik), '')
+                FROM duyuru_adaylari parent
+                WHERE parent.url=ek.detay_url
+                LIMIT 1
+            ), ek.baslik)
+            WHERE ek.eslesme_turu='ek_dosya'
+              AND (
+                   LOWER(ek.baslik) LIKE '%tıklay%'
+                OR LOWER(ek.baslik) LIKE '%tiklay%'
+              )
+        """)
+        conn.execute("""
             UPDATE duyuru_adaylari
             SET ihale_tarihi=NULL,
                 durum='tarih_bekleniyor',
@@ -177,6 +220,377 @@ def tablo_olustur() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_kaynaklar_sira ON kaynaklar(aktif, son_tarama)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_adaylar_durum ON duyuru_adaylari(durum, ilk_gorulme)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_adaylar_ihale_tarihi ON duyuru_adaylari(ihale_tarihi)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ihale_belgeleri (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                aday_id INTEGER NOT NULL,
+                url TEXT NOT NULL,
+                yerel_yol TEXT,
+                sha256 TEXT,
+                boyut INTEGER,
+                mime_turu TEXT,
+                durum TEXT NOT NULL DEFAULT 'bekliyor',
+                son_hata TEXT,
+                ilk_indirme TEXT,
+                son_kontrol TEXT NOT NULL,
+                UNIQUE(aday_id, url),
+                FOREIGN KEY(aday_id) REFERENCES duyuru_adaylari(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ihale_belgeleri_durum
+            ON ihale_belgeleri(durum, son_kontrol)
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ihale_belgeleri_sha256
+            ON ihale_belgeleri(sha256)
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ilan_analiz_verileri (
+                aday_id INTEGER PRIMARY KEY,
+                okul_adi TEXT,
+                okul_turu TEXT,
+                adres TEXT,
+                ogrenci_sayisi INTEGER,
+                personel_sayisi INTEGER,
+                muhammen_bedel NUMERIC,
+                muhammen_bedel_aylik NUMERIC,
+                muhammen_bedel_yillik NUMERIC,
+                muhammen_bedel_donemi TEXT,
+                sartname_bedeli NUMERIC,
+                gecici_teminat NUMERIC,
+                kantin_alani_m2 REAL,
+                kira_suresi_ay INTEGER,
+                belge_guveni INTEGER NOT NULL DEFAULT 0,
+                kaynak_belge_id INTEGER,
+                veri_yontemi TEXT NOT NULL DEFAULT 'belge_metni',
+                ham_metin TEXT,
+                guncelleme_tarihi TEXT NOT NULL,
+                FOREIGN KEY(aday_id) REFERENCES duyuru_adaylari(id) ON DELETE CASCADE,
+                FOREIGN KEY(kaynak_belge_id) REFERENCES ihale_belgeleri(id) ON DELETE SET NULL
+            )
+        """)
+        analiz_kolonlari = {
+            satir[1]
+            for satir in conn.execute(
+                "PRAGMA table_info(ilan_analiz_verileri)"
+            ).fetchall()
+        }
+        for kolon, tanim in {
+            "okul_turu": "TEXT",
+            "muhammen_bedel_aylik": "NUMERIC",
+            "muhammen_bedel_yillik": "NUMERIC",
+            "muhammen_bedel_donemi": "TEXT",
+        }.items():
+            if kolon not in analiz_kolonlari:
+                conn.execute(
+                    f"ALTER TABLE ilan_analiz_verileri ADD COLUMN {kolon} {tanim}"
+                )
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS bolge_verileri (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                il TEXT NOT NULL,
+                ilce TEXT NOT NULL DEFAULT '',
+                ekonomik_katsayi REAL NOT NULL DEFAULT 1.00,
+                gelir_katsayi REAL NOT NULL DEFAULT 1.00,
+                nufus_katsayi REAL NOT NULL DEFAULT 1.00,
+                ticari_hareketlilik_katsayi REAL NOT NULL DEFAULT 1.00,
+                kira_endeksi REAL,
+                ses_skoru REAL,
+                veri_kaynagi TEXT NOT NULL DEFAULT 'Henüz bağlanmadı',
+                guncelleme_tarihi TEXT NOT NULL,
+                UNIQUE(il, ilce)
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_bolge_verileri_il_ilce
+            ON bolge_verileri(il, ilce)
+        """)
+        conn.execute("""
+            INSERT OR IGNORE INTO bolge_verileri(
+                il, ilce, ekonomik_katsayi, gelir_katsayi, nufus_katsayi,
+                ticari_hareketlilik_katsayi, veri_kaynagi, guncelleme_tarihi
+            )
+            SELECT DISTINCT il, COALESCE(ilce, ''), 1.00, 1.00, 1.00, 1.00,
+                   'Henüz bağlanmadı', datetime('now', 'localtime')
+            FROM kaynaklar WHERE TRIM(il) <> ''
+        """)
+        conn.execute("""
+            CREATE TRIGGER IF NOT EXISTS trg_kaynak_bolge_varsayilani_ekle
+            AFTER INSERT ON kaynaklar
+            WHEN TRIM(NEW.il) <> ''
+            BEGIN
+                INSERT OR IGNORE INTO bolge_verileri(
+                    il, ilce, ekonomik_katsayi, gelir_katsayi, nufus_katsayi,
+                    ticari_hareketlilik_katsayi, veri_kaynagi, guncelleme_tarihi
+                ) VALUES (
+                    NEW.il, COALESCE(NEW.ilce, ''), 1.00, 1.00, 1.00, 1.00,
+                    'Henüz bağlanmadı', datetime('now', 'localtime')
+                );
+            END
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS kantin_yatirim_analizleri (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                aday_id INTEGER NOT NULL UNIQUE,
+                motor_surumu TEXT NOT NULL,
+                girdi_json TEXT NOT NULL,
+                varsayim_json TEXT NOT NULL,
+                sonuc_json TEXT NOT NULL,
+                tahmini_aylik_ciro NUMERIC NOT NULL,
+                tahmini_yillik_ciro NUMERIC NOT NULL DEFAULT 0,
+                ogrenci_sayisi INTEGER,
+                okul_tipi TEXT,
+                okul_tipi_katsayisi REAL,
+                baz_personel_sayisi INTEGER,
+                onerilen_calisan_sayisi INTEGER,
+                brut_maas NUMERIC,
+                aylik_calisma_saati REAL,
+                tahmini_net_maas NUMERIC,
+                sgk_maliyeti NUMERIC,
+                net_maas_sgk_toplami NUMERIC,
+                yan_hak_maliyeti NUMERIC,
+                kisi_basi_personel_maliyeti NUMERIC,
+                toplam_personel_gideri NUMERIC,
+                personel_hesaplama_modu TEXT,
+                manuel_calisan_sayisi INTEGER,
+                tahmini_net_kar NUMERIC NOT NULL,
+                kira_ciro_orani REAL NOT NULL,
+                risk_skoru REAL NOT NULL,
+                risk_seviyesi TEXT NOT NULL,
+                yatirim_skoru INTEGER NOT NULL,
+                maksimum_teklif NUMERIC NOT NULL,
+                yorum TEXT NOT NULL,
+                olusturma_tarihi TEXT NOT NULL,
+                guncelleme_tarihi TEXT NOT NULL,
+                FOREIGN KEY(aday_id) REFERENCES duyuru_adaylari(id) ON DELETE CASCADE
+            )
+        """)
+        yatirim_kolonlari = {
+            satir[1]
+            for satir in conn.execute(
+                "PRAGMA table_info(kantin_yatirim_analizleri)"
+            ).fetchall()
+        }
+        for kolon, tanim in {
+            "tahmini_yillik_ciro": "NUMERIC NOT NULL DEFAULT 0",
+            "ogrenci_sayisi": "INTEGER",
+            "okul_tipi": "TEXT",
+            "okul_tipi_katsayisi": "REAL",
+            "baz_personel_sayisi": "INTEGER",
+            "onerilen_calisan_sayisi": "INTEGER",
+            "brut_maas": "NUMERIC",
+            "aylik_calisma_saati": "REAL",
+            "tahmini_net_maas": "NUMERIC",
+            "sgk_maliyeti": "NUMERIC",
+            "net_maas_sgk_toplami": "NUMERIC",
+            "yan_hak_maliyeti": "NUMERIC",
+            "kisi_basi_personel_maliyeti": "NUMERIC",
+            "toplam_personel_gideri": "NUMERIC",
+            "personel_hesaplama_modu": "TEXT",
+            "manuel_calisan_sayisi": "INTEGER",
+        }.items():
+            if kolon not in yatirim_kolonlari:
+                conn.execute(
+                    f"ALTER TABLE kantin_yatirim_analizleri ADD COLUMN {kolon} {tanim}"
+                )
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_kantin_yatirim_skoru
+            ON kantin_yatirim_analizleri(yatirim_skoru DESC, risk_skoru)
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS analiz_manuel_duzeltmeleri (
+                aday_id INTEGER PRIMARY KEY,
+                okul_adi TEXT,
+                okul_turu TEXT,
+                ogrenci_sayisi INTEGER,
+                personel_sayisi INTEGER,
+                muhammen_bedel_aylik NUMERIC,
+                muhammen_bedel_yillik NUMERIC,
+                ogrenci_donusum_orani REAL,
+                ortalama_ogrenci_harcamasi NUMERIC,
+                yillik_egitim_gunu INTEGER,
+                hedef_net_kar_orani REAL,
+                otomatik_personel_hesapla INTEGER,
+                manuel_calisan_sayisi INTEGER,
+                asgari_ucret NUMERIC,
+                net_asgari_ucret NUMERIC,
+                brut_maas NUMERIC,
+                aylik_calisma_saati REAL,
+                tam_zamanli_aylik_saat REAL,
+                sgk_isveren_orani REAL,
+                issizlik_isveren_orani REAL,
+                yemek_maliyeti NUMERIC,
+                yol_maliyeti NUMERIC,
+                diger_yan_haklar NUMERIC,
+                duzeltme_notu TEXT,
+                duzelten TEXT NOT NULL DEFAULT 'admin',
+                olusturma_tarihi TEXT NOT NULL,
+                guncelleme_tarihi TEXT NOT NULL,
+                FOREIGN KEY(aday_id) REFERENCES duyuru_adaylari(id) ON DELETE CASCADE
+            )
+        """)
+        manuel_kolonlari = {
+            satir[1]
+            for satir in conn.execute(
+                "PRAGMA table_info(analiz_manuel_duzeltmeleri)"
+            ).fetchall()
+        }
+        if "yillik_egitim_gunu" not in manuel_kolonlari:
+            conn.execute(
+                "ALTER TABLE analiz_manuel_duzeltmeleri "
+                "ADD COLUMN yillik_egitim_gunu INTEGER"
+            )
+        if "hedef_net_kar_orani" not in manuel_kolonlari:
+            conn.execute(
+                "ALTER TABLE analiz_manuel_duzeltmeleri "
+                "ADD COLUMN hedef_net_kar_orani REAL"
+            )
+        for kolon, tanim in {
+            "otomatik_personel_hesapla": "INTEGER",
+            "manuel_calisan_sayisi": "INTEGER",
+            "asgari_ucret": "NUMERIC",
+            "net_asgari_ucret": "NUMERIC",
+            "brut_maas": "NUMERIC",
+            "aylik_calisma_saati": "REAL",
+            "tam_zamanli_aylik_saat": "REAL",
+            "sgk_isveren_orani": "REAL",
+            "issizlik_isveren_orani": "REAL",
+            "yemek_maliyeti": "NUMERIC",
+            "yol_maliyeti": "NUMERIC",
+            "diger_yan_haklar": "NUMERIC",
+        }.items():
+            if kolon not in manuel_kolonlari:
+                conn.execute(
+                    f"ALTER TABLE analiz_manuel_duzeltmeleri ADD COLUMN {kolon} {tanim}"
+                )
+        conn.execute("""
+            UPDATE ilan_analiz_verileri
+            SET muhammen_bedel_yillik=ROUND(muhammen_bedel_aylik * 9, 2)
+            WHERE muhammen_bedel_donemi='aylik'
+              AND muhammen_bedel_aylik IS NOT NULL
+              AND ABS(COALESCE(muhammen_bedel_yillik, 0)
+                      - muhammen_bedel_aylik * 12) < 0.01
+        """)
+        conn.execute("""
+            UPDATE analiz_manuel_duzeltmeleri
+            SET muhammen_bedel_yillik=ROUND(muhammen_bedel_aylik * 9, 2)
+            WHERE muhammen_bedel_aylik IS NOT NULL
+              AND ABS(COALESCE(muhammen_bedel_yillik, 0)
+                      - muhammen_bedel_aylik * 12) < 0.01
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS analiz_manuel_gecmisi (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                aday_id INTEGER NOT NULL,
+                islem TEXT NOT NULL,
+                onceki_json TEXT,
+                yeni_json TEXT,
+                duzelten TEXT NOT NULL DEFAULT 'admin',
+                islem_tarihi TEXT NOT NULL,
+                FOREIGN KEY(aday_id) REFERENCES duyuru_adaylari(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sistem_surumleri (
+                surum_kodu TEXT PRIMARY KEY,
+                surum_adi TEXT NOT NULL,
+                yayin_tarihi TEXT NOT NULL,
+                analiz_motoru_surumu TEXT NOT NULL,
+                git_etiketi TEXT NOT NULL,
+                aciklama TEXT NOT NULL
+            )
+        """)
+        for surum in SURUM_GECMISI:
+            conn.execute("""
+                INSERT INTO sistem_surumleri(
+                    surum_kodu, surum_adi, yayin_tarihi,
+                    analiz_motoru_surumu, git_etiketi, aciklama
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(surum_kodu) DO UPDATE SET
+                    surum_adi=excluded.surum_adi,
+                    yayin_tarihi=excluded.yayin_tarihi,
+                    analiz_motoru_surumu=excluded.analiz_motoru_surumu,
+                    git_etiketi=excluded.git_etiketi,
+                    aciklama=excluded.aciklama
+            """, (
+                surum["surum_kodu"], surum["surum_adi"],
+                surum["yayin_tarihi"], surum["analiz_motoru_surumu"],
+                surum["git_etiketi"], surum["aciklama"],
+            ))
+        conn.execute("DROP VIEW IF EXISTS ihale_analiz_kayitlari")
+        conn.execute("""
+            CREATE VIEW ihale_analiz_kayitlari AS
+            SELECT d.id AS aday_id,
+                   COALESCE(NULLIF(TRIM(m.okul_adi), ''), a.okul_adi) AS okul_adi,
+                   COALESCE(NULLIF(TRIM(m.okul_turu), ''), a.okul_turu) AS okul_turu,
+                   k.il,
+                   COALESCE(k.ilce, '') AS ilce,
+                   a.adres,
+                   COALESCE(m.ogrenci_sayisi, a.ogrenci_sayisi) AS ogrenci_sayisi,
+                   COALESCE(m.personel_sayisi, a.personel_sayisi) AS personel_sayisi,
+                   COALESCE(m.muhammen_bedel_aylik, a.muhammen_bedel_aylik)
+                       AS muhammen_bedel_aylik,
+                   COALESCE(m.muhammen_bedel_yillik, a.muhammen_bedel_yillik)
+                       AS muhammen_bedel_yillik,
+                   a.muhammen_bedel_donemi,
+                   a.sartname_bedeli,
+                   a.gecici_teminat,
+                   a.kantin_alani_m2,
+                   a.kira_suresi_ay,
+                   a.belge_guveni,
+                   d.baslik,
+                   d.url AS belge_url,
+                   d.yayin_tarihi,
+                   d.ihale_tarihi,
+                   d.durum,
+                   CASE WHEN NULLIF(TRIM(COALESCE(m.okul_adi, a.okul_adi)), '') IS NOT NULL
+                          AND NULLIF(TRIM(COALESCE(m.okul_turu, a.okul_turu)), '') IS NOT NULL
+                          AND COALESCE(m.ogrenci_sayisi, a.ogrenci_sayisi) IS NOT NULL
+                          AND COALESCE(m.muhammen_bedel_aylik, a.muhammen_bedel_aylik) IS NOT NULL
+                        THEN 1 ELSE 0 END AS analize_hazir,
+                   CASE WHEN m.aday_id IS NULL THEN 0 ELSE 1 END AS manuel_duzeltme,
+                   m.ogrenci_donusum_orani,
+                   m.ortalama_ogrenci_harcamasi,
+                   m.yillik_egitim_gunu,
+                   m.hedef_net_kar_orani,
+                   m.duzeltme_notu,
+                   y.yatirim_skoru,
+                   y.risk_seviyesi,
+                   y.tahmini_aylik_ciro,
+                   y.tahmini_yillik_ciro,
+                   y.okul_tipi_katsayisi,
+                   y.baz_personel_sayisi,
+                   y.onerilen_calisan_sayisi,
+                   y.kisi_basi_personel_maliyeti,
+                   y.net_maas_sgk_toplami,
+                   y.toplam_personel_gideri,
+                   y.personel_hesaplama_modu,
+                   y.tahmini_net_kar,
+                   y.maksimum_teklif,
+                   a.guncelleme_tarihi
+            FROM ilan_analiz_verileri a
+            JOIN duyuru_adaylari d ON d.id=a.aday_id
+            JOIN kaynaklar k ON k.id=d.kaynak_id
+            LEFT JOIN analiz_manuel_duzeltmeleri m ON m.aday_id=d.id
+            LEFT JOIN kantin_yatirim_analizleri y ON y.aday_id=d.id
+        """)
+        conn.execute("""
+            UPDATE ihale_belgeleri
+            SET durum='analiz_bekliyor',
+                son_hata='Okul adı, okul türü, öğrenci sayısı ve aylık muhammen bedel yeniden işlenecek'
+            WHERE durum='analiz_edildi'
+              AND EXISTS (
+                  SELECT 1 FROM ilan_analiz_verileri a
+                  WHERE a.aday_id=ihale_belgeleri.aday_id
+                    AND (
+                           NULLIF(TRIM(a.okul_adi), '') IS NULL
+                        OR NULLIF(TRIM(a.okul_turu), '') IS NULL
+                        OR a.ogrenci_sayisi IS NULL
+                        OR a.muhammen_bedel_aylik IS NULL
+                    )
+              )
+        """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS ham_duyurular (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -311,25 +725,9 @@ def ilanlari_getir() -> list[dict[str, Any]]:
 
 
 def eski_adaylari_temizle(en_eski: date | str | None = None) -> int:
-    """Tarihi bilinmeyen veya bir yillik pencerenin disindaki adaylari siler."""
-    if en_eski is None:
-        en_eski = ihale_tarih_siniri()
-    sinir = en_eski.isoformat() if isinstance(en_eski, date) else str(en_eski)
-    with closing(baglan()) as conn, conn:
-        cursor = conn.execute("""
-            DELETE FROM duyuru_adaylari
-            WHERE yayin_tarihi IS NULL
-               OR TRIM(yayin_tarihi) = ''
-               OR yayin_tarihi < ?
-        """, (sinir,))
-        silinen = cursor.rowcount
-        cursor = conn.execute("""
-            DELETE FROM ham_duyurular
-            WHERE yayin_tarihi IS NULL
-               OR TRIM(yayin_tarihi) = ''
-               OR yayin_tarihi < ?
-        """, (sinir,))
-        return silinen + cursor.rowcount
+    """Kalıcı arşiv politikası gereği ilan ve ham duyuru kayıtlarını silmez."""
+    del en_eski
+    return 0
 
 
 def ham_arsiv_ozeti() -> dict[str, int]:

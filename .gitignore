@@ -15,6 +15,9 @@ bot_korumasi.png
 worker.log
 worker_durumu.json
 worker_durumu.tmp
+belge_arsiv_durumu.json
+belge_arsiv_durumu.tmp
+manuel_tarama_istegi.json
 servisler.json
 .telegram_kimlik
 .telegram_kimlik.tmp
@@ -24,8 +27,10 @@ mobile_app/android/.gradle/
 mobile_app/android/app/build/
 mobile_app/ios/Pods/
 .admin_kimlik
+.admin_kimlik.tmp
 .env
 tmp/
+ilanlar/resmi_arsiv/
 *.db
 .pnpm-store/
-.pnpm-store/
+ihalex.zip

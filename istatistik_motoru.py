@@ -7,6 +7,8 @@ import unicodedata
 
 import pandas as pd
 
+from okul_adi_servisi import okul_adi_temizle
+
 
 KANTIN_DESENI = (
     r"\b(?:kantin\w*|büfe\w*|bufe\w*|çay\s+ocağ\w*|"
@@ -51,7 +53,7 @@ def okul_adi_ayikla(baslik: object) -> str | None:
         return None
     if re.search(r"mill[iî]\s+eğitim\s+müdürlüğü", aday, re.IGNORECASE):
         return None
-    return aday
+    return okul_adi_temizle(aday)
 
 
 def okul_anahtari(okul_adi: object) -> str:
