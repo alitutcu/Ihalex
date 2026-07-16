@@ -155,7 +155,7 @@ def stilleri_yukle(gomulu: bool) -> None:
             border: 2px solid var(--ihalex-black);
             border-radius: 16px;
             overflow: hidden;
-            margin: 1.15rem 0 1rem;
+            margin: 2.6rem 0 1rem;
             box-shadow: 0 7px 0 var(--ihalex-black);
         }}
         .ihalex-radar-banner::after {{
@@ -187,11 +187,62 @@ def stilleri_yukle(gomulu: bool) -> None:
             opacity: .72;
         }}
         .ihalex-radar-brand {{
+            position: relative;
+            isolation: isolate;
             display: flex;
             align-items: center;
             gap: clamp(.75rem, 1.4vw, 1.2rem);
             min-width: 0;
+            min-height: 100%;
             padding: 1rem clamp(1.25rem, 3vw, 2.7rem);
+            overflow: hidden;
+        }}
+        .ihalex-radar-brand::before,
+        .ihalex-radar-brand::after {{
+            content: "";
+            position: absolute;
+            z-index: 0;
+            left: clamp(.15rem, 1vw, .8rem);
+            top: 50%;
+            width: clamp(104px, 12vw, 142px);
+            aspect-ratio: 1;
+            border-radius: 50%;
+            transform: translateY(-50%);
+        }}
+        .ihalex-radar-brand::before {{
+            background:
+                radial-gradient(circle at 28% 24%, var(--ihalex-red) 0 3px, transparent 4px),
+                radial-gradient(circle at 72% 34%, var(--ihalex-black) 0 2px, transparent 3px),
+                radial-gradient(circle at 68% 74%, var(--ihalex-red) 0 2px, transparent 3px),
+                repeating-radial-gradient(
+                    circle at 50% 50%,
+                    transparent 0 17px,
+                    rgba(17,17,17,.24) 18px 19px,
+                    transparent 20px 32px
+                ),
+                linear-gradient(
+                    90deg,
+                    transparent 49%, rgba(17,17,17,.20) 49% 51%, transparent 51%
+                ),
+                linear-gradient(
+                    0deg,
+                    transparent 49%, rgba(17,17,17,.20) 49% 51%, transparent 51%
+                );
+            opacity: .72;
+        }}
+        .ihalex-radar-brand::after {{
+            background: conic-gradient(
+                from -34deg,
+                transparent 0 72%,
+                rgba(215,25,32,.36) 82%,
+                transparent 93%
+            );
+            animation: ihalex-marka-radar 5.5s linear infinite;
+            transform-origin: 50% 50%;
+        }}
+        .ihalex-radar-brand > * {{
+            position: relative;
+            z-index: 1;
         }}
         .ihalex-radar-brand h1 {{
             margin: 0;
@@ -207,37 +258,39 @@ def stilleri_yukle(gomulu: bool) -> None:
         .ihalex-human-i {{
             position: relative;
             flex: 0 0 auto;
-            width: clamp(25px, 2.6vw, 34px);
-            height: clamp(49px, 5.2vw, 66px);
-            margin-top: .55rem;
-            border-radius: 12px 15px 7px 9px;
+            width: clamp(14px, 1.65vw, 21px);
+            height: clamp(52px, 5.3vw, 68px);
+            margin: .6rem .1rem 0;
+            border-radius: 8px 8px 4px 4px;
             background: var(--ihalex-black);
-            transform: skewX(-4deg);
-            transform-origin: 50% 100%;
         }}
         .ihalex-human-i::before {{
             content: "";
             position: absolute;
-            width: 68%;
+            width: 74%;
             aspect-ratio: 1;
-            left: 24%;
-            top: -43%;
-            border: 3px solid var(--ihalex-black);
+            left: 13%;
+            top: -35%;
+            border: 2px solid var(--ihalex-black);
             border-radius: 50%;
             background: var(--ihalex-red);
         }}
         .ihalex-human-i::after {{
             content: "";
             position: absolute;
-            width: 198%;
-            height: 76%;
-            left: -49%;
-            top: -28%;
-            background: var(--ihalex-black);
-            clip-path: polygon(
-                0 50%, 9% 36%, 47% 57%, 87% 0, 100% 10%,
-                58% 82%, 43% 82%
-            );
+            width: 214%;
+            height: 58%;
+            left: -57%;
+            top: -12%;
+            background:
+                linear-gradient(
+                    55deg,
+                    transparent 42%, var(--ihalex-black) 43% 54%, transparent 55%
+                ) left center / 50% 100% no-repeat,
+                linear-gradient(
+                    -55deg,
+                    transparent 42%, var(--ihalex-black) 43% 54%, transparent 55%
+                ) right center / 50% 100% no-repeat;
         }}
         .ihalex-radar-copy {{
             position: relative;
@@ -304,8 +357,12 @@ def stilleri_yukle(gomulu: bool) -> None:
             text-align: center;
         }}
         @keyframes ihalex-radar-don {{ to {{ transform: rotate(360deg); }} }}
+        @keyframes ihalex-marka-radar {{
+            to {{ transform: translateY(-50%) rotate(360deg); }}
+        }}
         @media (prefers-reduced-motion: reduce) {{
-            .ihalex-radar-sweep {{ animation: none; }}
+            .ihalex-radar-sweep,
+            .ihalex-radar-brand::after {{ animation: none; }}
         }}
         .ihalex-portal-band {{
             background: #171717;
@@ -725,7 +782,7 @@ def stilleri_yukle(gomulu: bool) -> None:
                 grid-template-columns: minmax(0, 1fr) 78px;
                 height: 132px;
                 min-height: 132px;
-                margin-top: .85rem;
+                margin-top: 1.5rem;
                 border-radius: 13px;
                 box-shadow: 0 5px 0 var(--ihalex-black);
             }}
@@ -736,7 +793,7 @@ def stilleri_yukle(gomulu: bool) -> None:
                 padding: 1.1rem .75rem .35rem 1rem;
             }}
             .ihalex-radar-brand h1 {{ font-size: clamp(2rem, 10vw, 2.8rem); }}
-            .ihalex-human-i {{ width: 19px; height: 38px; margin-top: .35rem; }}
+            .ihalex-human-i {{ width: 13px; height: 40px; margin-top: .4rem; }}
             .ihalex-human-i::before {{ border-width: 2px; }}
             .ihalex-radar-copy {{
                 position: absolute;
