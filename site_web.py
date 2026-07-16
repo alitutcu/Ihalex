@@ -210,16 +210,18 @@ def stilleri_yukle(gomulu: bool) -> None:
             width: clamp(25px, 2.6vw, 34px);
             height: clamp(49px, 5.2vw, 66px);
             margin-top: .55rem;
-            border-radius: 14px 14px 7px 7px;
+            border-radius: 12px 15px 7px 9px;
             background: var(--ihalex-black);
+            transform: skewX(-4deg);
+            transform-origin: 50% 100%;
         }}
         .ihalex-human-i::before {{
             content: "";
             position: absolute;
             width: 68%;
             aspect-ratio: 1;
-            left: 16%;
-            top: -42%;
+            left: 24%;
+            top: -43%;
             border: 3px solid var(--ihalex-black);
             border-radius: 50%;
             background: var(--ihalex-red);
@@ -227,14 +229,14 @@ def stilleri_yukle(gomulu: bool) -> None:
         .ihalex-human-i::after {{
             content: "";
             position: absolute;
-            width: 190%;
-            height: 68%;
-            left: -45%;
-            top: -18%;
+            width: 198%;
+            height: 76%;
+            left: -49%;
+            top: -28%;
             background: var(--ihalex-black);
             clip-path: polygon(
-                0 8%, 10% 0, 50% 59%, 90% 0, 100% 8%,
-                57% 84%, 43% 84%
+                0 50%, 9% 36%, 47% 57%, 87% 0, 100% 10%,
+                58% 82%, 43% 82%
             );
         }}
         .ihalex-radar-copy {{
@@ -253,8 +255,8 @@ def stilleri_yukle(gomulu: bool) -> None:
         }}
         .ihalex-radar-copy strong {{
             display: block;
-            max-width: 300px;
-            font-size: clamp(1.15rem, 2vw, 1.65rem);
+            max-width: 360px;
+            font-size: clamp(1rem, 1.7vw, 1.4rem);
             line-height: 1.04;
         }}
         .ihalex-radar-signal {{
@@ -3147,7 +3149,7 @@ def uygulama() -> None:
         f"""
         <section class="ihalex-radar-banner"
                  style="--ihalex-banner-photo: url('{banner_foto}')"
-                 aria-label="İhalex, Türkiye'nin İhale Fırsat Haritası">
+                 aria-label="İhalex, Türkiye'nin İlk Yapay Zekâ Destekli Kantin İhale Platformu">
           <div class="ihalex-radar-photo" role="img"
                aria-label="Sarı duotone okul kantini panoraması"></div>
           <div class="ihalex-radar-brand" role="img" aria-label="İHALEX">
@@ -3156,7 +3158,7 @@ def uygulama() -> None:
           </div>
           <div class="ihalex-radar-copy">
             <small>OKUL KANTİNİ İHALE AĞI</small>
-            <strong>Türkiye’nin İhale Fırsat Haritası</strong>
+            <strong>Türkiye’nin İlk Yapay Zekâ Destekli Kantin İhale Platformu</strong>
           </div>
           <div class="ihalex-radar-signal" aria-label="81 il canlı tarama">
             <i class="ihalex-radar-sweep" aria-hidden="true"></i>
